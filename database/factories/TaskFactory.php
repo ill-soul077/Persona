@@ -25,7 +25,7 @@ class TaskFactory extends Factory
      */
     public function definition(): array
     {
-        $status = fake()->randomElement(['pending', 'in_progress', 'completed', 'cancelled']);
+        $status = fake()->randomElement(['pending', 'completed']);
         
         $titles = [
             'Submit assignment',
@@ -47,7 +47,10 @@ class TaskFactory extends Factory
             'due_date' => fake()->dateTimeBetween('now', '+30 days'),
             'status' => $status,
             'priority' => fake()->randomElement(['low', 'medium', 'high']),
-            'recurrence' => fake()->boolean(20) ? fake()->randomElement(['daily', 'weekly', 'monthly']) : null,
+            'recurrence_type' => fake()->boolean(20) ? fake()->randomElement(['daily', 'weekly', 'monthly']) : 'none',
+            'recurrence_interval' => 1,
+            'tags' => fake()->boolean(50) ? [fake()->word(), fake()->word()] : null,
+            'created_via_ai' => fake()->boolean(30),
             'completed_at' => $status === 'completed' ? fake()->dateTimeBetween('-7 days', 'now') : null,
         ];
     }
@@ -90,7 +93,8 @@ class TaskFactory extends Factory
     public function recurring(?string $pattern = null): static
     {
         return $this->state(fn (array $attributes) => [
-            'recurrence' => $pattern ?? fake()->randomElement(['daily', 'weekly', 'monthly']),
+            'recurrence_type' => $pattern ?? fake()->randomElement(['daily', 'weekly', 'monthly']),
+            'recurrence_interval' => 1,
         ]);
     }
 

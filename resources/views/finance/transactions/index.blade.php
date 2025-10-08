@@ -1,32 +1,28 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-gray-900">Transactions</h1>
+            
+            <div class="flex space-x-3">
+                <button @click="$dispatch('open-chatbot')" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                    </svg>
+                    Chat
+                </button>
+                
+                <a href="{{ route('finance.transactions.create') }}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Transaction
+                </a>
+            </div>
+        </div>
+    </x-slot>
 
-@section('title', 'Transactions')
-
-@section('header')
-<div class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold text-gray-900">Transactions</h1>
-    
-    <div class="flex space-x-3">
-        <button @click="$dispatch('open-chatbot')" 
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-            </svg>
-            Chat
-        </button>
-        
-        <a href="{{ route('finance.transactions.create') }}" 
-           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Add Transaction
-        </a>
-    </div>
-</div>
-@endsection
-
-@section('content')
 <!-- Filters -->
 <div class="bg-white rounded-lg shadow p-6 mb-6" x-data="{ showFilters: {{ request()->hasAny(['type', 'category_type', 'category_id', 'start_date', 'end_date', 'search']) ? 'true' : 'false' }} }">
     <div class="flex items-center justify-between mb-4">
@@ -205,4 +201,4 @@
     </div>
     @endif
 </div>
-@endsection
+</x-app-layout>

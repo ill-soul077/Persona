@@ -1,36 +1,29 @@
-@extends('layouts.app')
-
-@section('title', 'Task Tracker')
-
-@section('content')
-<div class="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50">
-    <!-- Header -->
-    <div class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-900">📋 Task Tracker</h1>
-                    <p class="mt-1 text-sm text-gray-600">Manage your tasks efficiently</p>
-                </div>
-                <div class="flex gap-3">
-                    <button onclick="showQuickAddModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        Quick Add
-                    </button>
-                    <a href="{{ route('tasks.create') }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        New Task
-                    </a>
-                </div>
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex justify-between items-center">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                📋 Task Tracker
+            </h2>
+            <div class="flex gap-3">
+                <button onclick="showQuickAddModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Quick Add
+                </button>
+                <a href="{{ route('tasks.create') }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Task
+                </a>
             </div>
         </div>
-    </div>
+    </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
@@ -309,4 +302,6 @@ async function toggleTaskStatus(taskId) {
     }
 }
 </script>
-@endsection
+        </div>
+    </div>
+</x-app-layout>

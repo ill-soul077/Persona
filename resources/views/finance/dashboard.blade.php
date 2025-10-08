@@ -1,37 +1,37 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                Finance Dashboard
+            </h2>
+            
+            <!-- Date Range Selector -->
+            <form method="GET" class="flex items-center space-x-2" x-data="{ updating: false }">
+                <input type="date" 
+                       name="start_date" 
+                       value="{{ request('start_date', $startDate->format('Y-m-d')) }}"
+                       class="rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                       @change="$el.form.submit(); updating = true">
+                <span class="text-gray-500 dark:text-gray-400">to</span>
+                <input type="date" 
+                       name="end_date" 
+                       value="{{ request('end_date', $endDate->format('Y-m-d')) }}"
+                       class="rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                       @change="$el.form.submit(); updating = true">
+                <button type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg x-show="updating" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Update
+                </button>
+            </form>
+        </div>
+    </x-slot>
 
-@section('title', 'Finance Dashboard')
-
-@section('header')
-<div class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold text-gray-900">Finance Dashboard</h1>
-    
-    <!-- Date Range Selector -->
-    <form method="GET" class="flex items-center space-x-2" x-data="{ updating: false }">
-        <input type="date" 
-               name="start_date" 
-               value="{{ request('start_date', $startDate->format('Y-m-d')) }}"
-               class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-               @change="$el.form.submit(); updating = true">
-        <span class="text-gray-500">to</span>
-        <input type="date" 
-               name="end_date" 
-               value="{{ request('end_date', $endDate->format('Y-m-d')) }}"
-               class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-               @change="$el.form.submit(); updating = true">
-        <button type="submit" 
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            <svg x-show="updating" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Update
-        </button>
-    </form>
-</div>
-@endsection
-
-@section('content')
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 <!-- Summary Cards -->
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
     <!-- Total Income Card -->
@@ -194,7 +194,7 @@
                 @endforeach
             </ul>
             @else
-            <div class="text-center py-12 text-gray-400">
+            <div class="text-center py-12 text-gray-400 dark:text-gray-500">
                 <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
                 </svg>
@@ -204,9 +204,11 @@
         </div>
     </div>
 </div>
-@endsection
+        </div>
+    </div>
 
-@push('scripts')
+    <!-- Chart.js Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 <script>
 @if($expenseBreakdown->isNotEmpty())
 // Chart.js configuration
@@ -281,7 +283,7 @@ labels.forEach((label, index) => {
 
 function showCategoryDrilldown(category) {
     // Implement drill-down modal (will add in next iteration)
-    showToast(`Showing transactions for: ${category}`, 'success');
+    alert(`Showing transactions for: ${category}`);
 }
 
 function refreshChart() {
@@ -289,4 +291,4 @@ function refreshChart() {
 }
 @endif
 </script>
-@endpush
+</x-app-layout>

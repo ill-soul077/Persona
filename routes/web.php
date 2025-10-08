@@ -1,12 +1,31 @@
 <?php
 
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
+// Welcome/Landing Page
 Route::get('/', function () {
-    return redirect()->route('finance.dashboard');
+    return redirect()->route('dashboard');
+});
+
+// Unified Dashboard (Main Dashboard)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart.data');
+    
+    // Chatbot Page
+    Route::view('/chatbot', 'chatbot.index')->name('chatbot');
+    
+    // Profile Routes
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 // Finance Module Routes
@@ -37,22 +56,25 @@ Route::middleware(['auth'])->prefix('tasks')->name('tasks.')->group(function () 
     Route::post('/{task}/toggle-status', [TaskController::class, 'toggleStatus'])->name('toggle.status');
     Route::post('/quick-add', [TaskController::class, 'quickAdd'])->name('quick.add');
     
-    // Calendar Feed (JSON)
+    // Calendar & Export
+    Route::get('/calendar', [TaskController::class, 'calendar'])->name('calendar');
     Route::get('/calendar/feed', [TaskController::class, 'calendarFeed'])->name('calendar.feed');
+    Route::get('/export', [TaskController::class, 'export'])->name('export');
 });
 
-// Chat API Routes
+// Chat/AI API Routes (for AJAX)
 Route::middleware(['auth'])->prefix('api/chat')->name('chat.')->group(function () {
-    // Finance Parsing
-    Route::post('/parse-finance', [ChatController::class, 'parseFinance'])->name('parse.finance');
+    Route::post('/send', [ChatController::class, 'send'])->name('send');
     Route::post('/confirm-transaction', [ChatController::class, 'confirmTransaction'])->name('confirm.transaction');
-    
-    // Task Parsing
-    Route::post('/parse-task', [ChatController::class, 'parseTask'])->name('parse.task');
     Route::post('/confirm-task', [ChatController::class, 'confirmTask'])->name('confirm.task');
     Route::post('/update-task', [ChatController::class, 'updateTask'])->name('update.task');
 });
 
-// Authentication routes (will be added later)
-require __DIR__.'/auth.php';
+// Settings & Reports
+Route::middleware(['auth'])->group(function () {
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+});
 
+// Authentication Routes
+require __DIR__.'/auth.php';

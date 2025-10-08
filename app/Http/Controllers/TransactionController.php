@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 /**
  * Transaction Controller
@@ -20,11 +21,12 @@ use Illuminate\Support\Facades\Validator;
  */
 class TransactionController extends Controller
 {
+    use AuthorizesRequests;
+    
     protected GeminiService $geminiService;
 
     public function __construct(GeminiService $geminiService)
     {
-        $this->middleware('auth');
         $this->geminiService = $geminiService;
     }
 
