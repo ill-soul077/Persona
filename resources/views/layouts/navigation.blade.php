@@ -1,4 +1,13 @@
-<nav x-data="{ open: false }" class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+<nav x-data="{ open: false, theme: localStorage.getItem('theme') || 'system' }" x-init="
+    const root = document.documentElement;
+    const applyTheme = () => {
+        const isDark = theme==='dark' || (theme==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.classList.toggle('dark', isDark);
+        localStorage.setItem('theme', theme);
+    };
+    applyTheme();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => theme==='system' && applyTheme());
+" class="bg-white/80 dark:bg-gray-800/80 backdrop-blur border-b border-gray-100 dark:border-gray-700">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -11,15 +20,44 @@
                 </div>
 
                 <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                <div class="hidden space-x-2 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('tasks.index')" :active="request()->routeIs('tasks.*')">
+                        {{ __('Tasks') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('finance.dashboard')" :active="request()->is('finance/*')">
+                        {{ __('Finance') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('chatbot')" :active="request()->routeIs('chatbot')">
+                        {{ __('Chatbot') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.index')">
+                        {{ __('Reports') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.index')">
+                        {{ __('Settings') }}
                     </x-nav-link>
                 </div>
             </div>
 
             <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            <div class="hidden sm:flex sm:items-center sm:ms-6 gap-3">
+                <!-- Theme Toggle -->
+                <div class="relative">
+                    <button @click="
+                        theme = theme==='light' ? 'dark' : theme==='dark' ? 'system' : 'light';
+                        const isDark = theme==='dark' || (theme==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                        document.documentElement.classList.toggle('dark', isDark);
+                        localStorage.setItem('theme', theme);
+                    " title="Toggle theme" class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                        <span x-show="theme==='light'">🌞</span>
+                        <span x-show="theme==='dark'">🌙</span>
+                        <span x-show="theme==='system'">🖥️</span>
+                    </button>
+                </div>
+
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition ease-in-out duration-150">
@@ -69,6 +107,21 @@
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('tasks.index')" :active="request()->routeIs('tasks.*')">
+                {{ __('Tasks') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('finance.dashboard')" :active="request()->is('finance/*')">
+                {{ __('Finance') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('chatbot')" :active="request()->routeIs('chatbot')">
+                {{ __('Chatbot') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.index')">
+                {{ __('Reports') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.index')">
+                {{ __('Settings') }}
             </x-responsive-nav-link>
         </div>
 

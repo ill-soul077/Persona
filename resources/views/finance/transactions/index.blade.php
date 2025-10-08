@@ -24,13 +24,16 @@
     </x-slot>
 
 <!-- Filters -->
-<div class="bg-white rounded-lg shadow p-6 mb-6" x-data="{ showFilters: {{ request()->hasAny(['type', 'category_type', 'category_id', 'start_date', 'end_date', 'search']) ? 'true' : 'false' }} }">
+<div class="bg-white rounded-lg shadow p-6 mb-6 sticky top-4 z-10" x-data="{ showFilters: {{ request()->hasAny(['type', 'category_type', 'category_id', 'start_date', 'end_date', 'search']) ? 'true' : 'false' }}, clientSearch: '' }">
     <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-gray-900">Filters</h2>
-        <button @click="showFilters = !showFilters" class="text-sm text-indigo-600 hover:text-indigo-800">
+        <div class="flex items-center gap-3">
+            <input type="text" x-model="clientSearch" placeholder="Quick search..." class="hidden md:block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            <button @click="showFilters = !showFilters" class="text-sm text-indigo-600 hover:text-indigo-800">
             <span x-show="!showFilters">Show Filters</span>
             <span x-show="showFilters">Hide Filters</span>
-        </button>
+            </button>
+        </div>
     </div>
     
     <form method="GET" x-show="showFilters" x-cloak class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -90,23 +93,23 @@
 </div>
 
 <!-- Transactions Table -->
-<div class="bg-white rounded-lg shadow overflow-hidden">
+<div class="bg-white rounded-lg shadow overflow-hidden" x-data="transactionsTable()"><!-- x-data component -->
     @if($transactions->isNotEmpty())
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="sortBy('date')">Date <span x-text="sort.key==='date' ? (sort.asc ? '▲' : '▼') : ''"></span></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="sortBy('type')">Type <span x-text="sort.key==='type' ? (sort.asc ? '▲' : '▼') : ''"></span></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="sortBy('category')">Category <span x-text="sort.key==='category' ? (sort.asc ? '▲' : '▼') : ''"></span></th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="sortBy('amount')">Amount <span x-text="sort.key==='amount' ? (sort.asc ? '▲' : '▼') : ''"></span></th>
                     <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="bg-white divide-y divide-gray-200" x-ref="tbody">
                 @foreach($transactions as $transaction)
-                <tr class="hover:bg-gray-50 transition-colors">
+                <tr class="hover:bg-gray-50 transition-colors" x-show="matchesSearch($el)">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {{ $transaction->date->format('M d, Y') }}
                     </td>
@@ -200,5 +203,40 @@
         </div>
     </div>
     @endif
+        <!-- Client-side enhancement scripts -->
+        @push('scripts')
+        <script>
+            document.addEventListener('alpine:init', () => {
+                window.transactionsTable = function() {
+                    return {
+                        sort: { key: 'date', asc: false },
+                        sortBy(key) {
+                            this.sort.asc = this.sort.key === key ? !this.sort.asc : true;
+                            this.sort.key = key;
+                            this.applySort();
+                        },
+                        applySort() {
+                            const rows = Array.from(this.$refs.tbody.querySelectorAll('tr'));
+                            const idx = { date:0, type:1, category:2, description:3, amount:4 }[this.sort.key];
+                            rows.sort((a,b) => {
+                                const ta = a.children[idx].innerText.trim();
+                                const tb = b.children[idx].innerText.trim();
+                                const na = this.sort.key==='amount' ? parseFloat(ta.replace(/[^0-9.-]/g,'')) : ta;
+                                const nb = this.sort.key==='amount' ? parseFloat(tb.replace(/[^0-9.-]/g,'')) : tb;
+                                if(na<nb) return this.sort.asc?-1:1; if(na>nb) return this.sort.asc?1:-1; return 0;
+                            });
+                            rows.forEach(r => this.$refs.tbody.appendChild(r));
+                        },
+                        matchesSearch(row) {
+                            const q = (document.querySelector('input[x-model=clientSearch]')?.value || '').toLowerCase();
+                            if(!q) return true;
+                            return row.innerText.toLowerCase().includes(q);
+                        }
+                    }
+                }
+            });
+        </script>
+        @endpush
+    
 </div>
 </x-app-layout>
