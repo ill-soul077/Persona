@@ -280,4 +280,194 @@ class ChatController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Confirm and save parsed task
+     */
+    public function confirmTask(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ai_log_id' => 'required|exists:ai_logs,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'due_date' => 'nullable|date',
+            'priority' => 'required|in:low,medium,high',
+            'recurrence_type' => 'nullable|in:none,daily,weekly,monthly',
+            'tags' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Mark AI log as applied
+            $aiLog = AiLog::findOrFail($request->ai_log_id);
+            
+            // Parse tags
+            $tags = null;
+            if ($request->filled('tags')) {
+                $tags = array_map('trim', explode(',', $request->tags));
+            }
+
+            // Create task
+            $task = \App\Models\Task::create([
+                'user_id' => Auth::id(),
+                'title' => $request->title,
+                'description' => $request->description,
+                'due_date' => $request->due_date,
+                'priority' => $request->priority,
+                'recurrence_type' => $request->recurrence_type ?? 'none',
+                'recurrence_interval' => 1,
+                'tags' => $tags,
+                'status' => 'pending',
+                'created_via_ai' => true,
+                'ai_raw_input' => $aiLog->raw_text,
+            ]);
+
+            // Calculate next occurrence for recurring tasks
+            if ($task->recurrence_type !== 'none' && $task->due_date) {
+                $task->next_occurrence = $task->calculateNextOccurrence();
+                $task->save();
+            }
+
+            // Log history
+            $task->logHistory('created', [
+                'title' => $task->title,
+                'created_via_ai' => true,
+            ]);
+
+            $aiLog->markAsApplied();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Task created successfully!',
+                'task' => $task,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Task confirmation failed', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save task: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update existing task via AI parsing
+     */
+    public function updateTask(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'message' => 'required|string|max:500',
+            'task_id' => 'required|exists:tasks,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $rawText = $request->message;
+        $userId = Auth::id();
+
+        try {
+            // Check task ownership
+            $task = \App\Models\Task::findOrFail($request->task_id);
+            if ($task->user_id !== $userId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access.',
+                ], 403);
+            }
+
+            // Parse the update text with context
+            $contextPrompt = "Update task: '{$task->title}'. User says: '{$rawText}'";
+            $parsed = $this->geminiService->parseTaskText($contextPrompt);
+
+            // Create AI log
+            $aiLog = AiLog::create([
+                'user_id' => $userId,
+                'module' => 'tasks',
+                'raw_text' => $rawText,
+                'parsed_json' => array_merge($parsed, ['task_id' => $task->id]),
+                'model' => 'gemini',
+                'confidence' => $parsed['confidence'] ?? null,
+                'status' => 'pending_review',
+                'ip_address' => $request->ip(),
+            ]);
+
+            // Detect action from text
+            $action = $this->detectTaskAction($rawText);
+
+            if ($action === 'complete') {
+                $task->markAsCompleted();
+                $aiLog->markAsApplied();
+
+                return response()->json([
+                    'success' => true,
+                    'action' => 'completed',
+                    'message' => 'Task marked as completed!',
+                    'task' => $task->fresh(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'action' => 'update',
+                'parsed' => $parsed,
+                'current_task' => $task,
+                'ai_log_id' => $aiLog->id,
+                'message' => 'Update parsed. Please review and confirm.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Task update parse error', [
+                'user_id' => $userId,
+                'task_id' => $request->task_id,
+                'raw_text' => $rawText,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to parse update.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Detect task action from raw text
+     */
+    protected function detectTaskAction(string $text): ?string
+    {
+        $text = strtolower($text);
+        
+        // Complete/done keywords
+        if (preg_match('/\b(complete|completed|done|finished|mark as done)\b/i', $text)) {
+            return 'complete';
+        }
+
+        // Uncomplete/reopen keywords
+        if (preg_match('/\b(uncomplete|incomplete|reopen|not done|mark as pending)\b/i', $text)) {
+            return 'uncomplete';
+        }
+
+        // Delete keywords
+        if (preg_match('/\b(delete|remove|cancel)\b/i', $text)) {
+            return 'delete';
+        }
+
+        return null;
+    }
 }
