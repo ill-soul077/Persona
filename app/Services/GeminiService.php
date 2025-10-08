@@ -175,17 +175,21 @@ class GeminiService
      */
     protected function buildFinancePrompt(string $rawText): string
     {
+        $currentDate = now()->toIso8601String();
+        
         return <<<PROMPT
 You are a financial transaction parser. Extract structured data from natural language input.
 
 Input: "{$rawText}"
 
-Extract the following information and return ONLY valid JSON (no markdown, no explanation):
+Extract the following information and return ONLY valid JSON (no markdown, no explanation, no code blocks):
 {
     "type": "income" or "expense",
     "amount": numeric value,
-    "category": category slug (food, fast_food, clothing, education, transport, entertainment, health, from_home, tuition, freelance, part_time_job, investment, gift, other),
-    "description": brief description,
+    "currency": "BDT" or "USD" (detect from context: taka/tk = BDT, dollar/$ = USD, default BDT),
+    "category": category slug from list below,
+    "description": brief description or item purchased,
+    "date": ISO 8601 date (default: "{$currentDate}"),
     "meta": {
         "vendor": vendor name if mentioned,
         "location": location if mentioned,
@@ -195,13 +199,26 @@ Extract the following information and return ONLY valid JSON (no markdown, no ex
     "confidence": your confidence score (0.0 to 1.0)
 }
 
-Rules:
-- If "spent", "paid", "bought" → type is "expense"
-- If "received", "earned", "got" → type is "income"
-- Extract numeric amounts (e.g., "15", "twenty five")
-- Map to appropriate category slug
-- Include vendor/location in meta if mentioned
-- Return confidence based on clarity of input
+CATEGORY SLUGS:
+Income: from_home, tuition, freelance, part_time_job, investment, gift, other
+Expense: food, fast_food, groceries, dining_out, coffee_snacks, clothing, education, books_supplies, tuition_fees, transport, fuel, public_transit, ride_sharing, entertainment, health, other
+
+RULES:
+- Type detection: "spent", "paid", "bought", "drank" → expense | "received", "earned", "got", "income" → income
+- Extract amounts: "30 taka", "5000 tk", "$25", "150" → numeric only
+- Currency: "taka", "tk" → BDT | "dollar", "$", "usd" → USD | default → BDT
+- Category mapping: "burger", "food" → fast_food | "tea", "coffee" → coffee_snacks | "tuition" → tuition (if income) or tuition_fees (if expense)
+- Description: Extract item/reason from "on burger", "for coffee", etc.
+- Vendor: "at Starbucks", "from McDonald's" → vendor name
+- Confidence: 0.9+ if all fields clear, 0.7-0.8 if some ambiguity, <0.6 if unclear
+
+EXAMPLES:
+"spent 30 taka on burger" → {"type":"expense","amount":30,"currency":"BDT","category":"fast_food","description":"burger","date":"{$currentDate}","meta":{},"confidence":0.95}
+"received 5000 taka tuition" → {"type":"income","amount":5000,"currency":"BDT","category":"tuition","description":"tuition payment","date":"{$currentDate}","meta":{},"confidence":0.92}
+"paid 150 for coffee at Starbucks downtown" → {"type":"expense","amount":150,"currency":"BDT","category":"coffee_snacks","description":"coffee","date":"{$currentDate}","meta":{"vendor":"Starbucks","location":"downtown"},"confidence":0.98}
+
+NOW PARSE: "{$rawText}"
+Return ONLY the JSON object, no other text.
 PROMPT;
     }
 
