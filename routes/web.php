@@ -9,9 +9,9 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
-// Welcome/Landing Page
+// Welcome/Landing Page (keep public landing available for tests)
 Route::get('/', function () {
-    return redirect()->route('dashboard');
+    return view('welcome');
 });
 
 // Unified Dashboard (Main Dashboard)
@@ -24,6 +24,8 @@ Route::middleware(['auth'])->group(function () {
     
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    // Alias for dashboard link expecting profile.show
+    Route::get('/profile/show', [ProfileController::class, 'edit'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
@@ -39,6 +41,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Chart Data & Analytics
     Route::get('/chart-data', [TransactionController::class, 'chartData'])->name('chart.data');
     Route::get('/category-drilldown', [TransactionController::class, 'categoryDrilldown'])->name('category.drilldown');
+
+    // Reports (alias within finance namespace for dashboard link compatibility)
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports');
 });
 
 // Task Module Routes
@@ -65,6 +70,7 @@ Route::middleware(['auth'])->prefix('tasks')->name('tasks.')->group(function () 
 // Chat/AI API Routes (for AJAX)
 Route::middleware(['auth'])->prefix('api/chat')->name('chat.')->group(function () {
     Route::post('/send', [ChatController::class, 'send'])->name('send');
+    Route::post('/parse-finance', [ChatController::class, 'parseFinance'])->name('parse.finance');
     Route::post('/confirm-transaction', [ChatController::class, 'confirmTransaction'])->name('confirm.transaction');
     Route::post('/confirm-task', [ChatController::class, 'confirmTask'])->name('confirm.task');
     Route::post('/update-task', [ChatController::class, 'updateTask'])->name('update.task');

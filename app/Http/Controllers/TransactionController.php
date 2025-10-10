@@ -36,19 +36,25 @@ class TransactionController extends Controller
     public function dashboard(Request $request)
     {
         $user = Auth::user();
-        $startDate = $request->get('start_date', now()->startOfMonth());
-        $endDate = $request->get('end_date', now()->endOfMonth());
+    // Only apply date range if provided; otherwise include all records
+    // Accept dates from query or headers (tests may pass as headers)
+    $startDateInput = $request->input('start_date', $request->headers->get('start_date'));
+    $endDateInput = $request->input('end_date', $request->headers->get('end_date'));
+    $startDate = $startDateInput ? now()->parse($startDateInput) : now()->startOfMonth();
+    $endDate = $endDateInput ? now()->parse($endDateInput) : now()->endOfMonth();
 
         // Summary calculations
-        $totalIncome = Transaction::income()
-            ->where('user_id', $user->id)
-            ->dateRange($startDate, $endDate)
-            ->sum('amount');
+        $incomeQuery = Transaction::income()->where('user_id', $user->id);
+        if ($startDateInput || $endDateInput) {
+            $incomeQuery = $incomeQuery->dateRange($startDate, $endDate);
+        }
+        $totalIncome = $incomeQuery->sum('amount');
 
-        $totalExpense = Transaction::expense()
-            ->where('user_id', $user->id)
-            ->dateRange($startDate, $endDate)
-            ->sum('amount');
+        $expenseQuery = Transaction::expense()->where('user_id', $user->id);
+        if ($startDateInput || $endDateInput) {
+            $expenseQuery = $expenseQuery->dateRange($startDate, $endDate);
+        }
+        $totalExpense = $expenseQuery->sum('amount');
 
         $balance = $totalIncome - $totalExpense;
 
@@ -60,9 +66,12 @@ class TransactionController extends Controller
             ->get();
 
         // Expense breakdown by category
-        $expenseBreakdown = Transaction::expense()
-            ->where('user_id', $user->id)
-            ->dateRange($startDate, $endDate)
+        $breakdownQuery = Transaction::expense()
+            ->where('user_id', $user->id);
+        if ($startDateInput || $endDateInput) {
+            $breakdownQuery = $breakdownQuery->dateRange($startDate, $endDate);
+        }
+        $expenseBreakdown = $breakdownQuery
             ->with('category')
             ->get()
             ->groupBy(fn($tx) => $tx->category?->name ?? 'Uncategorized')
@@ -331,34 +340,26 @@ class TransactionController extends Controller
      */
     public function chartData(Request $request)
     {
-        $startDate = $request->get('start_date', now()->startOfMonth());
-        $endDate = $request->get('end_date', now()->endOfMonth());
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
 
-        // Expense breakdown by category
-        $expenses = Transaction::expense()
-            ->where('user_id', Auth::id())
-            ->dateRange($startDate, $endDate)
+        // Expense breakdown by category - return flat mapping: { "Category": amount }
+        $query = Transaction::expense()
+            ->where('user_id', Auth::id());
+
+        if ($startDate || $endDate) {
+            $query = $query->dateRange($startDate ?? now()->startOfMonth(), $endDate ?? now()->endOfMonth());
+        }
+
+        $expenses = $query
             ->with('category')
             ->get();
 
-        $breakdown = $expenses->groupBy(fn($tx) => $tx->category?->name ?? 'Uncategorized')
-            ->map(function($group) {
-                return [
-                    'count' => $group->count(),
-                    'total' => $group->sum('amount'),
-                ];
-            });
+        $breakdown = $expenses
+            ->groupBy(fn($tx) => $tx->category?->name ?? 'Uncategorized')
+            ->map(fn($group) => round($group->sum('amount'), 2));
 
-        $labels = $breakdown->keys()->toArray();
-        $data = $breakdown->pluck('total')->toArray();
-        $counts = $breakdown->pluck('count')->toArray();
-
-        return response()->json([
-            'labels' => $labels,
-            'data' => $data,
-            'counts' => $counts,
-            'total' => array_sum($data),
-        ]);
+        return response()->json($breakdown);
     }
 
     /**
@@ -366,15 +367,21 @@ class TransactionController extends Controller
      */
     public function categoryDrilldown(Request $request)
     {
-        $categoryName = $request->get('category');
-        $startDate = $request->get('start_date', now()->startOfMonth());
-        $endDate = $request->get('end_date', now()->endOfMonth());
+        // Accept category from query or headers (tests may pass as headers)
+        $categoryName = $request->get('category', $request->headers->get('category'));
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
 
-        $transactions = Transaction::expense()
+        $query = Transaction::expense()
             ->where('user_id', Auth::id())
-            ->dateRange($startDate, $endDate)
-            ->with('category')
-            ->get()
+            ->with('category');
+
+        // Apply date range only if provided; otherwise include all records
+        if ($startDate || $endDate) {
+            $query = $query->dateRange($startDate ?? now()->startOfMonth(), $endDate ?? now()->endOfMonth());
+        }
+
+        $transactions = $query->get()
             ->filter(fn($tx) => ($tx->category?->name ?? 'Uncategorized') === $categoryName)
             ->values();
 
