@@ -8,18 +8,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
-class TaskController extends BaseController
+class TaskController extends Controller
 {
     use AuthorizesRequests;
 
     public function __construct()
     {
-        // Temporarily commented out for testing
-        // $this->middleware('auth');
+        $this->middleware('auth');
     }
 
     /**
@@ -32,8 +30,8 @@ class TaskController extends BaseController
         $priority = $request->get('priority');
         $tag = $request->get('tag');
 
-        // Temporarily show all tasks for testing
-        $query = Task::with(['history' => function($q) {
+        $query = Task::where('user_id', Auth::id())
+            ->with(['history' => function($q) {
                 $q->latest()->limit(5);
             }]);
 
@@ -68,17 +66,18 @@ class TaskController extends BaseController
             ->orderByRaw("FIELD(priority, 'urgent', 'high', 'medium', 'low')")
             ->paginate(20);
 
-        // Get stats for the view (temporarily show all for testing)
+        // Get stats for the view
         $stats = [
-            'total' => Task::count(),
-            'today' => Task::whereDate('due_date', today())->count(),
-            'week' => Task::whereBetween('due_date', [today(), today()->addDays(7)])->count(),
-            'overdue' => Task::where('due_date', '<', now())->where('status', '!=', 'completed')->count(),
-            'completed' => Task::where('status', 'completed')->count(),
+            'total' => Task::where('user_id', Auth::id())->count(),
+            'today' => Task::where('user_id', Auth::id())->whereDate('due_date', today())->count(),
+            'week' => Task::where('user_id', Auth::id())->whereBetween('due_date', [today(), today()->addDays(7)])->count(),
+            'overdue' => Task::where('user_id', Auth::id())->where('due_date', '<', now())->where('status', '!=', 'completed')->count(),
+            'completed' => Task::where('user_id', Auth::id())->where('status', 'completed')->count(),
         ];
 
-        // Get all unique tags for filter (temporarily show all for testing)
-        $allTags = Task::whereNotNull('tags')
+        // Get all unique tags for filter
+        $allTags = Task::where('user_id', Auth::id())
+            ->whereNotNull('tags')
             ->get()
             ->pluck('tags')
             ->flatten()
@@ -130,9 +129,9 @@ class TaskController extends BaseController
                 $tags = array_filter($tags); // Remove empty tags
             }
 
-            // Create task (use user ID 1 for testing)
+            // Create task
             $task = Task::create([
-                'user_id' => 1, // Auth::id() - temporarily hardcoded for testing
+                'user_id' => Auth::id(),
                 'title' => $validated['title'],
                 'description' => $validated['description'],
                 'due_date' => $dueDateTime,

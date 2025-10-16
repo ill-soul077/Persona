@@ -1,95 +1,107 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('AI Chatbot') }}
-        </h2>
-    </x-slot>
+@extends('layouts.app-master')
 
-    <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <div class="space-y-6">
-                        <!-- Instructions -->
-                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                            <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">💡 How to use the AI Chatbot</h3>
-                            <div class="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                                <p><strong>For Finances:</strong> "Add expense of $25 for lunch" or "I earned $500 from freelancing"</p>
-                                <p><strong>For Tasks:</strong> "Remind me to call John tomorrow at 3pm" or "Add task to finish report by Friday"</p>
-                            </div>
-                        </div>
+@section('title', 'AI Chatbot')
+@section('page-icon', '🤖')
+@section('page-title', 'AI Assistant')
 
-                        <!-- Chat Messages -->
-                        <div id="chatMessages" class="space-y-4 max-h-96 overflow-y-auto">
-                            <div class="flex justify-start">
-                                <div class="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2 max-w-xs">
-                                    <p class="text-sm text-gray-900 dark:text-gray-100">
-                                        Hi! I'm your AI assistant. I can help you add transactions and tasks using natural language. What would you like to do?
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chat Input -->
-                        <div class="flex space-x-2">
-                            <input
-                                type="text"
-                                id="chatInput"
-                                placeholder="Type your message here..."
-                                class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                            >
-                            <button
-                                id="sendButton"
-                                class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                Send
-                            </button>
-                        </div>
-
-                        <!-- Loading State -->
-                        <div id="loadingState" class="hidden flex justify-start">
-                            <div class="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2">
-                                <div class="flex items-center space-x-2">
-                                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                                    <span class="text-sm text-gray-900 dark:text-gray-100">AI is thinking...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+@section('content')
+<!-- Page Header -->
+<div class="glass-card rounded-xl p-6 animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">AI Assistant</h1>
+            <p class="text-gray-300 mt-2">Chat with your personal AI to manage tasks and finances</p>
         </div>
     </div>
+</div>
 
-    <!-- Confirmation Modal -->
-    <div id="confirmationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100" id="modalTitle">Confirm Action</h3>
-                <div class="mt-2 px-7 py-3">
-                    <p class="text-sm text-gray-500 dark:text-gray-400" id="modalContent">
-                        <!-- Content will be populated by JavaScript -->
+<!-- Chat Container -->
+<div class="glass-card rounded-xl p-6 animate-fade-in">
+    <div class="space-y-6">
+        <!-- Instructions -->
+        <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-blue-300 mb-2">💡 How to use the AI Chatbot</h3>
+            <div class="text-sm text-gray-300 space-y-1">
+                <p><strong>For Finances:</strong> "Add expense of $25 for lunch" or "I earned $500 from freelancing"</p>
+                <p><strong>For Tasks:</strong> "Remind me to call John tomorrow at 3pm" or "Add task to finish report by Friday"</p>
+            </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div id="chatMessages" class="space-y-4 max-h-96 overflow-y-auto bg-white/5 rounded-lg p-4 backdrop-blur-sm">
+            <div class="flex justify-start">
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 max-w-xs border border-white/20">
+                    <p class="text-sm text-white">
+                        Hi! I'm your AI assistant. I can help you add transactions and tasks using natural language. What would you like to do?
                     </p>
                 </div>
-                <div class="items-center px-4 py-3">
-                    <button
-                        id="confirmButton"
-                        class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-24 mr-2 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300"
-                    >
-                        Confirm
-                    </button>
-                    <button
-                        id="cancelButton"
-                        class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-24 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                    >
-                        Cancel
-                    </button>
+            </div>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="flex space-x-2">
+            <input
+                type="text"
+                id="chatInput"
+                placeholder="Type your message here..."
+                class="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all backdrop-blur-sm"
+            >
+            <button
+                id="sendButton"
+                class="glass-button px-6 py-3 text-white rounded-xl font-medium flex items-center space-x-2 transition-all"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+                <span>Send</span>
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden flex justify-start">
+            <div class="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+                <div class="flex items-center space-x-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+                    <span class="text-sm text-white">AI is thinking...</span>
                 </div>
             </div>
         </div>
     </div>
+</div>
+@endsection
 
-    <script>
+@section('modals')
+<!-- Confirmation Modal -->
+<div id="confirmationModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border border-white/20 w-96 shadow-2xl rounded-xl bg-white/10 backdrop-blur-lg">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg font-medium text-white" id="modalTitle">Confirm Action</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-300" id="modalContent">
+                    <!-- Content will be populated by JavaScript -->
+                </p>
+            </div>
+            <div class="items-center px-4 py-3 space-x-3">
+                <button
+                    id="confirmButton"
+                    class="px-6 py-2 bg-green-500 text-white text-base font-medium rounded-xl hover:bg-green-600 transition-all transform hover:scale-105"
+                >
+                    Confirm
+                </button>
+                <button
+                    id="cancelButton"
+                    class="px-6 py-2 bg-gray-500 text-white text-base font-medium rounded-xl hover:bg-gray-600 transition-all transform hover:scale-105"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script>
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
@@ -152,10 +164,10 @@
             messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
             
             const bubbleDiv = document.createElement('div');
-            bubbleDiv.className = `rounded-lg px-4 py-2 max-w-xs ${
+            bubbleDiv.className = `rounded-lg px-4 py-2 max-w-xs border ${
                 sender === 'user' 
-                    ? 'bg-indigo-600 text-white' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-blue-400/50' 
+                    : 'bg-white/10 backdrop-blur-sm text-white border-white/20'
             }`;
             
             const messageP = document.createElement('p');
@@ -250,5 +262,5 @@
                 hideConfirmationModal();
             }
         });
-    </script>
-</x-app-layout>
+</script>
+@endsection

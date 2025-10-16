@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') - Persona</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -37,6 +38,7 @@
             min-height: 100vh;
             overflow-x: hidden;
             position: relative;
+            padding-top: 80px; /* Add padding to account for fixed navigation */
         }
 
         /* Animated Background */
@@ -95,6 +97,12 @@
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: var(--shadow);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            width: 100%;
         }
 
         .glass-card {
@@ -193,7 +201,7 @@
     </div>
 
     <!-- Navigation Bar -->
-    <nav class="glass-nav sticky top-0 z-50 animate-fade-in">
+    <nav class="glass-nav animate-fade-in">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center space-x-4">
@@ -221,6 +229,12 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                         </svg>
                         <span>Tasks</span>
+                    </a>
+                    <a href="{{ url('/chatbot') }}" class="text-gray-300 hover:text-white transition-colors flex items-center space-x-2 {{ request()->is('chatbot') ? 'text-white bg-white/20 px-3 py-2 rounded-lg' : '' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                        </svg>
+                        <span>Chatbot</span>
                     </a>
                     <a href="{{ route('reports.index') }}" class="text-gray-300 hover:text-white transition-colors flex items-center space-x-2 {{ request()->routeIs('reports.*') ? 'text-white bg-white/20 px-3 py-2 rounded-lg' : '' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,6 +291,14 @@
                             <span>Tasks</span>
                         </div>
                     </a>
+                    <a href="{{ url('/chatbot') }}" class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors {{ request()->is('chatbot') ? 'text-white bg-white/20' : '' }}">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                            </svg>
+                            <span>Chatbot</span>
+                        </div>
+                    </a>
                     <a href="{{ route('reports.index') }}" class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors {{ request()->routeIs('reports.*') ? 'text-white bg-white/20' : '' }}">
                         <div class="flex items-center space-x-3">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,6 +320,33 @@
             </div>
         </div>
     </nav>
+
+    <!-- Flash Messages -->
+    @if(session('success'))
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <div class="glass-card rounded-xl p-4 bg-green-500/20 border-green-400/50 animate-fade-in">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-green-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span class="text-green-300 font-medium">{{ session('success') }}</span>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <div class="glass-card rounded-xl p-4 bg-red-500/20 border-red-400/50 animate-fade-in">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-red-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-red-300 font-medium">{{ session('error') }}</span>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- Main Content -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">

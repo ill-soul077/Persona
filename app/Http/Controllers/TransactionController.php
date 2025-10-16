@@ -170,10 +170,16 @@ class TransactionController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            return redirect()->back()
+                           ->withErrors($validator)
+                           ->withInput();
         }
 
         DB::beginTransaction();
@@ -212,20 +218,32 @@ class TransactionController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaction created successfully!',
-                'transaction' => $transaction->load('category'),
-                'redirect' => route('finance.dashboard')
-            ]);
+            // Handle different request types
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transaction created successfully!',
+                    'transaction' => $transaction->load('category'),
+                    'redirect' => route('finance.dashboard')
+                ]);
+            }
+
+            return redirect()->route('finance.transactions.index')
+                           ->with('success', 'Transaction created successfully!');
 
         } catch (\Exception $e) {
             DB::rollBack();
             
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create transaction: ' . $e->getMessage()
-            ], 500);
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create transaction: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                           ->withErrors(['error' => 'Failed to create transaction: ' . $e->getMessage()])
+                           ->withInput();
         }
     }
 
