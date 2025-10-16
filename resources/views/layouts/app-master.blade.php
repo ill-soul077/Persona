@@ -189,6 +189,101 @@
             display: block;
         }
 
+        /* Logout button special styling */
+        .logout-btn {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logout-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .logout-btn:hover::before {
+            left: 100%;
+        }
+
+        .logout-btn:hover {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.3)) !important;
+            border-color: rgba(239, 68, 68, 0.5) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.2), 0 8px 10px -6px rgba(239, 68, 68, 0.1);
+        }
+
+        /* User profile avatar animation */
+        .user-avatar {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .user-avatar::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #3b82f6, #06b6d4, #8b5cf6, #3b82f6);
+            border-radius: inherit;
+            z-index: -1;
+            animation: rotate 3s linear infinite;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .user-avatar:hover::before {
+            opacity: 1;
+        }
+
+        .user-avatar:hover {
+            transform: scale(1.1);
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Dropdown animation improvements */
+        .dropdown-enter {
+            animation: dropdownEnter 0.2s ease-out forwards;
+        }
+
+        .dropdown-leave {
+            animation: dropdownLeave 0.15s ease-in forwards;
+        }
+
+        @keyframes dropdownEnter {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes dropdownLeave {
+            from {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0.95) translateY(-10px);
+            }
+        }
+
         @yield('additional-styles')
     </style>
 </head>
@@ -249,6 +344,52 @@
                         </svg>
                         <span>Settings</span>
                     </a>
+                    
+                    <!-- User Profile & Logout Dropdown -->
+                    <div class="relative" x-data="{ open: false }">
+                        <!-- User Profile Button -->
+                        <button @click="open = !open" class="text-gray-300 hover:text-white transition-colors flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-white/10">
+                            <div class="w-8 h-8 user-avatar rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                                @auth
+                                    {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                                @else
+                                    U
+                                @endauth
+                            </div>
+                            <span class="font-medium">
+                                @auth
+                                    {{ auth()->user()->name }}
+                                @else
+                                    User
+                                @endauth
+                            </span>
+                            <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+
+                        <!-- Dropdown Menu -->
+                        <div x-show="open" @click.away="open = false" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95" class="absolute right-0 mt-2 w-48 glass-card rounded-xl shadow-lg z-50">
+                            <div class="p-2">
+                                <a href="{{ route('profile.edit') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                    </svg>
+                                    <span>Profile</span>
+                                </a>
+                                <div class="border-t border-white/10 my-2"></div>
+                                <form method="POST" action="{{ route('logout') }}" class="w-full" onsubmit="return confirm('Are you sure you want to logout?')">
+                                    @csrf
+                                    <button type="submit" class="logout-btn flex items-center space-x-3 px-4 py-3 text-red-300 hover:text-red-100 rounded-lg transition-all w-full text-left group border border-transparent">
+                                        <svg class="w-5 h-5 group-hover:animate-pulse transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                        </svg>
+                                        <span class="font-medium">Logout</span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action Buttons & Mobile Menu -->
@@ -316,6 +457,36 @@
                             <span>Settings</span>
                         </div>
                     </a>
+                    
+                    <!-- User Profile & Logout (Mobile) -->
+                    <div class="border-t border-white/10 mt-4 pt-4">
+                        <div class="px-4 py-3 text-gray-400 text-sm font-medium">
+                            @auth
+                                Logged in as {{ auth()->user()->name }}
+                            @else
+                                User Account
+                            @endauth
+                        </div>
+                        <a href="{{ route('profile.edit') }}" class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                            <div class="flex items-center space-x-3">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                                <span>Profile</span>
+                            </div>
+                        </a>
+                        <form method="POST" action="{{ route('logout') }}" class="w-full" onsubmit="return confirm('Are you sure you want to logout?')">
+                            @csrf
+                            <button type="submit" class="logout-btn block w-full px-4 py-3 text-red-300 hover:text-red-100 rounded-lg transition-all text-left border border-transparent">
+                                <div class="flex items-center space-x-3">
+                                    <svg class="w-5 h-5 transition-transform hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                    </svg>
+                                    <span class="font-medium">Logout</span>
+                                </div>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -355,6 +526,9 @@
 
     @yield('modals')
 
+    <!-- Alpine.js for interactive components -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     <!-- Mobile Menu Toggle Script -->
     <script>
         document.getElementById('mobile-menu-btn').addEventListener('click', function() {
@@ -371,6 +545,16 @@
                 mobileMenu.classList.remove('active');
             }
         });
+
+        // Logout confirmation functionality (disabled - using browser confirm for now)
+        /*
+        document.addEventListener('DOMContentLoaded', function() {
+            // Custom confirmation dialog code here if needed
+        });
+        */
+
+        // Simple logout functionality with browser confirm
+        // The forms now use onsubmit="return confirm('Are you sure you want to logout?')"
     </script>
 
     @yield('scripts')
