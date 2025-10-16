@@ -19,8 +19,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart.data');
     
-    // Chatbot Page
-    Route::view('/chatbot', 'chatbot.index')->name('chatbot');
+    // Chatbot Routes
+    Route::get('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'index'])->name('chatbot');
+    Route::post('/chatbot/process', [\App\Http\Controllers\ChatbotController::class, 'processMessage'])->name('chatbot.process');
+    Route::post('/chatbot/confirm', [\App\Http\Controllers\ChatbotController::class, 'confirmTransaction'])->name('chatbot.confirm');
+    
+    // Test Routes (remove after testing)
+    Route::get('/test/gemini-api', [\App\Http\Controllers\TestController::class, 'testGeminiApi']);
+    Route::get('/test/gemini-service', [\App\Http\Controllers\TestController::class, 'testGeminiService']);
+    Route::post('/debug/chatbot', function(\Illuminate\Http\Request $request) {
+        \Illuminate\Support\Facades\Log::info('DEBUG - Chatbot data received:', $request->all());
+        return response()->json(['data' => $request->all(), 'user' => \Illuminate\Support\Facades\Auth::user()]);
+    });
     
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

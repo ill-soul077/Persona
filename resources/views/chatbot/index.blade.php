@@ -20,19 +20,20 @@
     <div class="space-y-6">
         <!-- Instructions -->
         <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4">
-            <h3 class="text-sm font-medium text-blue-300 mb-2">💡 How to use the AI Chatbot</h3>
+            <h3 class="text-sm font-medium text-blue-300 mb-2">💡 How to use the AI Assistant</h3>
             <div class="text-sm text-gray-300 space-y-1">
-                <p><strong>For Finances:</strong> "Add expense of $25 for lunch" or "I earned $500 from freelancing"</p>
-                <p><strong>For Tasks:</strong> "Remind me to call John tomorrow at 3pm" or "Add task to finish report by Friday"</p>
+                <p><strong>Track Expenses:</strong> "spent 25 taka on coffee" or "bought lunch for 150 tk"</p>
+                <p><strong>Record Income:</strong> "received 5000 salary" or "earned 1000 from freelance"</p>
+                <p><strong>General Chat:</strong> Ask about your spending patterns or financial advice</p>
             </div>
         </div>
 
         <!-- Chat Messages -->
         <div id="chatMessages" class="space-y-4 max-h-96 overflow-y-auto bg-white/5 rounded-lg p-4 backdrop-blur-sm">
             <div class="flex justify-start">
-                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 max-w-xs border border-white/20">
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 max-w-sm border border-white/20">
                     <p class="text-sm text-white">
-                        Hi! I'm your AI assistant. I can help you add transactions and tasks using natural language. What would you like to do?
+                        Hi! 👋 I'm your Persona AI assistant. I can help you track expenses and income using natural language. Try saying something like "spent 50 taka on lunch" or "received 2000 salary"!
                     </p>
                 </div>
             </div>
@@ -127,7 +128,7 @@
             loadingState.classList.remove('hidden');
 
             // Send to AI
-            fetch('{{ route("chat.send") }}', {
+            fetch('{{ route("chatbot.process") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -141,14 +142,14 @@
                 
                 if (data.success) {
                     // Add AI response
-                    addMessage(data.response, 'ai');
+                    addMessage(data.message, 'ai');
 
-                    // Check if confirmation is needed
-                    if (data.requiresConfirmation) {
-                        showConfirmationModal(data);
+                    // Check if it's a transaction preview
+                    if (data.type === 'transaction_preview') {
+                        showTransactionPreview(data);
                     }
                 } else {
-                    addMessage('Sorry, I encountered an error: ' + (data.error || 'Unknown error'), 'ai');
+                    addMessage('Sorry, I encountered an error: ' + (data.message || 'Unknown error'), 'ai');
                 }
             })
             .catch(error => {
@@ -182,54 +183,46 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Show confirmation modal
-        function showConfirmationModal(data) {
+        // Show transaction preview modal
+        function showTransactionPreview(data) {
             pendingConfirmation = data;
             
-            if (data.type === 'transaction') {
-                modalTitle.textContent = 'Confirm Transaction';
-                modalContent.innerHTML = `
-                    <strong>Type:</strong> ${data.parsedData.type}<br>
-                    <strong>Amount:</strong> $${data.parsedData.amount}<br>
-                    <strong>Description:</strong> ${data.parsedData.description}<br>
-                    <strong>Category:</strong> ${data.parsedData.category || 'N/A'}<br>
-                    <strong>Date:</strong> ${data.parsedData.date || 'Today'}
-                `;
-            } else if (data.type === 'task') {
-                modalTitle.textContent = 'Confirm Task';
-                modalContent.innerHTML = `
-                    <strong>Title:</strong> ${data.parsedData.title}<br>
-                    <strong>Description:</strong> ${data.parsedData.description || 'N/A'}<br>
-                    <strong>Due Date:</strong> ${data.parsedData.due_date || 'Not specified'}<br>
-                    <strong>Priority:</strong> ${data.parsedData.priority || 'Medium'}
-                `;
-            }
+            modalTitle.textContent = 'Confirm Transaction';
+            const transaction = data.transaction;
+            const amount = parseFloat(transaction.amount).toFixed(2);
+            const categoryName = transaction.category ? transaction.category.name : 'Uncategorized';
+            
+            modalContent.innerHTML = `
+                <div class="text-left space-y-2">
+                    <p><strong>Type:</strong> ${transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}</p>
+                    <p><strong>Amount:</strong> ৳${amount}</p>
+                    <p><strong>Category:</strong> ${categoryName}</p>
+                    <p><strong>Description:</strong> ${transaction.description}</p>
+                    <p><strong>Date:</strong> ${transaction.date}</p>
+                </div>
+            `;
             
             confirmationModal.classList.remove('hidden');
         }
 
-        // Confirm action
+        // Confirm transaction
         confirmButton.addEventListener('click', function() {
-            if (!pendingConfirmation) return;
+            if (!pendingConfirmation || !pendingConfirmation.transaction) return;
 
-            const endpoint = pendingConfirmation.type === 'transaction' 
-                ? '{{ route("chat.confirm.transaction") }}'
-                : '{{ route("chat.confirm.task") }}';
-
-            fetch(endpoint, {
+            fetch('{{ route("chatbot.confirm") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify(pendingConfirmation.parsedData)
+                body: JSON.stringify(pendingConfirmation.transaction)
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    addMessage(`✅ ${pendingConfirmation.type === 'transaction' ? 'Transaction' : 'Task'} created successfully!`, 'ai');
+                    addMessage('✅ ' + data.message, 'ai');
                 } else {
-                    addMessage(`❌ Error creating ${pendingConfirmation.type}: ${data.error}`, 'ai');
+                    addMessage('❌ Error: ' + data.message, 'ai');
                 }
                 hideConfirmationModal();
             })

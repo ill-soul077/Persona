@@ -61,9 +61,9 @@ class GeminiService
      */
     public function __construct()
     {
-        $this->baseUrl = config('services.gemini.base_url', env('GEMINI_BASE_URL'));
-        $this->apiKey = config('services.gemini.api_key', env('GEMINI_API_KEY'));
-        $this->model = config('services.gemini.model', env('GEMINI_MODEL', 'gemini-1.5-flash'));
+        $this->baseUrl = 'https://generativelanguage.googleapis.com/v1/models';
+        $this->apiKey = 'AIzaSyBmX9e8OozSX8NAWwOa8094OM-9eNZGY-8';
+        $this->model = 'gemini-2.5-flash';
         $this->maxTokens = (int) config('services.gemini.max_tokens', env('GEMINI_MAX_TOKENS', 1024));
         $this->temperature = (float) config('services.gemini.temperature', env('GEMINI_TEMPERATURE', 0.7));
     }
@@ -273,10 +273,11 @@ PROMPT;
      */
     protected function callGeminiAPI(string $prompt): array
     {
+        $url = "{$this->baseUrl}/{$this->model}:generateContent?key={$this->apiKey}";
+        
         $response = Http::timeout(15)
-            ->post("{$this->baseUrl}/models/{$this->model}:generateContent", [
-                'key' => $this->apiKey,
-            ], [
+            ->withHeaders(['Content-Type' => 'application/json'])
+            ->post($url, [
                 'contents' => [
                     [
                         'parts' => [
