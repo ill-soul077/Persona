@@ -23,14 +23,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'index'])->name('chatbot');
     Route::post('/chatbot/process', [\App\Http\Controllers\ChatbotController::class, 'processMessage'])->name('chatbot.process');
     Route::post('/chatbot/confirm', [\App\Http\Controllers\ChatbotController::class, 'confirmTransaction'])->name('chatbot.confirm');
-    
-    // Test Routes (remove after testing)
-    Route::get('/test/gemini-api', [\App\Http\Controllers\TestController::class, 'testGeminiApi']);
-    Route::get('/test/gemini-service', [\App\Http\Controllers\TestController::class, 'testGeminiService']);
-    Route::post('/debug/chatbot', function(\Illuminate\Http\Request $request) {
-        \Illuminate\Support\Facades\Log::info('DEBUG - Chatbot data received:', $request->all());
-        return response()->json(['data' => $request->all(), 'user' => \Illuminate\Support\Facades\Auth::user()]);
-    });
+    Route::post('/chatbot/confirm-task', [\App\Http\Controllers\ChatbotController::class, 'confirmTask'])->name('chatbot.confirm-task');
     
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

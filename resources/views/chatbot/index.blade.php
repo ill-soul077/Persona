@@ -148,6 +148,10 @@
                     if (data.type === 'transaction_preview') {
                         showTransactionPreview(data);
                     }
+                    // Check if it's a task preview
+                    else if (data.type === 'task_preview') {
+                        showTaskPreview(data);
+                    }
                 } else {
                     addMessage('Sorry, I encountered an error: ' + (data.message || 'Unknown error'), 'ai');
                 }
@@ -205,17 +209,52 @@
             confirmationModal.classList.remove('hidden');
         }
 
-        // Confirm transaction
-        confirmButton.addEventListener('click', function() {
-            if (!pendingConfirmation || !pendingConfirmation.transaction) return;
+        // Show task preview modal
+        function showTaskPreview(data) {
+            pendingConfirmation = data;
+            
+            modalTitle.textContent = 'Confirm Task';
+            const task = data.task;
+            const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date';
+            const dueTime = task.due_date ? new Date(task.due_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+            const tags = task.tags && task.tags.length > 0 ? task.tags.join(', ') : 'None';
+            
+            modalContent.innerHTML = `
+                <div class="text-left space-y-2">
+                    <p><strong>Title:</strong> ${task.title}</p>
+                    <p><strong>Due Date:</strong> ${dueDate}${dueTime ? ' at ' + dueTime : ''}</p>
+                    <p><strong>Priority:</strong> ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</p>
+                    <p><strong>Tags:</strong> ${tags}</p>
+                    ${task.description && task.description !== task.title ? `<p><strong>Description:</strong> ${task.description}</p>` : ''}
+                </div>
+            `;
+            
+            confirmationModal.classList.remove('hidden');
+        }
 
-            fetch('{{ route("chatbot.confirm") }}', {
+        // Confirm transaction or task
+        confirmButton.addEventListener('click', function() {
+            if (!pendingConfirmation) return;
+
+            // Determine if it's a transaction or task
+            let url, data;
+            if (pendingConfirmation.transaction) {
+                url = '{{ route("chatbot.confirm") }}';
+                data = pendingConfirmation.transaction;
+            } else if (pendingConfirmation.task) {
+                url = '{{ route("chatbot.confirm-task") }}';
+                data = pendingConfirmation.task;
+            } else {
+                return;
+            }
+
+            fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify(pendingConfirmation.transaction)
+                body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(data => {
