@@ -8,14 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 @endsection
 
-@section('action-buttons')
-<a href="{{ route('finance.transactions.create') }}" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
-    <span>Add Transaction</span>
-</a>
-@endsection
+
 
 @section('content')
 <!-- Finance Dashboard Header -->
@@ -32,6 +25,12 @@
                 </svg>
                 <span>Refresh Data</span>
             </button>
+            <a href="{{ route('finance.transactions.create') }}" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>Add Transaction</span>
+            </a>
         </div>
     </div>
 </div>

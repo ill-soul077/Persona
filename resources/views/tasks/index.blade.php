@@ -4,22 +4,33 @@
 @section('page-icon', '📋')
 @section('page-title', 'Task Tracker')
 
-@section('action-buttons')
-<button onclick="showQuickAddModal()" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
-    <span>Quick Add</span>
-</button>
-<a href="{{ route('tasks.create') }}" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
-    <span>New Task</span>
-</a>
-@endsection
+
 
 @section('content')
+<!-- Task Tracker Header -->
+<div class="glass-card rounded-xl p-6 animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Task Tracker</h1>
+            <p class="text-gray-300 mt-2">Manage your tasks and stay productive</p>
+        </div>
+        <div class="mt-4 md:mt-0 flex space-x-3">
+            <button onclick="showQuickAddModal()" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>Quick Add</span>
+            </button>
+            <a href="{{ route('tasks.create') }}" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>New Task</span>
+            </a>
+        </div>
+    </div>
+</div>
+
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-5 gap-6 animate-slide-up">
     <div class="glass-card rounded-xl p-6 border-l-4 border-blue-500 animate-bounce-in">
