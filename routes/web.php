@@ -41,6 +41,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Transactions CRUD
     Route::resource('transactions', TransactionController::class);
     
+    // AI Receipt Scanner
+    Route::post('/transactions/scan-receipt', [TransactionController::class, 'scanReceipt'])->name('transactions.scan-receipt');
+    
     // Chart Data & Analytics
     Route::get('/chart-data', [TransactionController::class, 'chartData'])->name('chart.data');
     Route::get('/category-drilldown', [TransactionController::class, 'categoryDrilldown'])->name('category.drilldown');

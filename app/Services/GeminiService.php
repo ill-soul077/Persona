@@ -430,4 +430,155 @@ PROMPT;
         $count = Cache::get($key, 0);
         Cache::put($key, $count + 1, now()->endOfDay());
     }
+
+    /**
+     * Scan receipt image using Gemini Vision API
+     * 
+     * @param string $imageBase64 Base64 encoded image data
+     * @param string $mimeType Image MIME type (e.g., 'image/jpeg', 'image/png')
+     * @return array {
+     *   'amount': float,
+     *   'date': string (ISO format),
+     *   'description': string,
+     *   'merchantName': string,
+     *   'category': string
+     * }
+     * @throws \Exception on API failure
+     */
+    public function scanReceipt(string $imageBase64, string $mimeType = 'image/jpeg'): array
+    {
+        try {
+            $prompt = "Analyze this receipt image and extract the following information in JSON format:\n" .
+                      "- Total amount (just the number)\n" .
+                      "- Date (in ISO format YYYY-MM-DD)\n" .
+                      "- Description or items purchased (brief summary)\n" .
+                      "- Merchant/store name\n" .
+                      "- Suggested category (one of: housing, transportation, groceries, utilities, entertainment, food, shopping, healthcare, education, personal, travel, insurance, gifts, bills, other-expense)\n\n" .
+                      "Only respond with valid JSON in this exact format:\n" .
+                      "{\n" .
+                      '  "amount": number,' . "\n" .
+                      '  "date": "ISO date string",' . "\n" .
+                      '  "description": "string",' . "\n" .
+                      '  "merchantName": "string",' . "\n" .
+                      '  "category": "string"' . "\n" .
+                      "}\n\n" .
+                      "If it's not a receipt, return an empty object: {}";
+
+            $url = "{$this->baseUrl}/gemini-1.5-flash:generateContent?key=AIzaSyDCqTGpqjAg_kloatcccju80uHSrVLhbYg";
+
+            $response = Http::timeout(30)->post($url, [
+                'contents' => [
+                    [
+                        'parts' => [
+                            [
+                                'text' => $prompt
+                            ],
+                            [
+                                'inline_data' => [
+                                    'mime_type' => $mimeType,
+                                    'data' => $imageBase64
+                                ]
+                            ]
+                        ]
+                    ]
+                ],
+                'generationConfig' => [
+                    'temperature' => 0.2,
+                    'maxOutputTokens' => 1024,
+                ]
+            ]);
+
+            if (!$response->successful()) {
+                Log::error('Gemini receipt scan API error', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                throw new \Exception('Failed to scan receipt: ' . $response->body());
+            }
+
+            $data = $response->json();
+            
+            if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+                throw new \Exception('Invalid response format from Gemini API');
+            }
+
+            $textResponse = $data['candidates'][0]['content']['parts'][0]['text'];
+            
+            // Extract JSON from response (remove markdown code blocks if present)
+            $textResponse = preg_replace('/```json\s*/', '', $textResponse);
+            $textResponse = preg_replace('/```\s*$/', '', $textResponse);
+            $textResponse = trim($textResponse);
+            
+            $receiptData = json_decode($textResponse, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('Failed to parse Gemini receipt response', [
+                    'response' => $textResponse,
+                    'error' => json_last_error_msg()
+                ]);
+                throw new \Exception('Failed to parse receipt data: ' . json_last_error_msg());
+            }
+
+            // Validate receipt data
+            if (empty($receiptData)) {
+                return [
+                    'error' => 'Not a valid receipt image',
+                    'success' => false
+                ];
+            }
+
+            // Map category to match your system
+            if (isset($receiptData['category'])) {
+                $receiptData['category'] = $this->mapReceiptCategory($receiptData['category']);
+            }
+
+            $this->incrementRequestCounter();
+
+            return array_merge([
+                'success' => true,
+                'amount' => $receiptData['amount'] ?? 0,
+                'date' => $receiptData['date'] ?? now()->format('Y-m-d'),
+                'description' => $receiptData['description'] ?? '',
+                'merchantName' => $receiptData['merchantName'] ?? '',
+                'category' => $receiptData['category'] ?? 'other-expense'
+            ], $receiptData);
+
+        } catch (\Exception $e) {
+            Log::error('Receipt scanning error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Map receipt category to system category
+     */
+    protected function mapReceiptCategory(string $category): string
+    {
+        $categoryMap = [
+            'housing' => 'housing',
+            'transportation' => 'transportation',
+            'groceries' => 'groceries',
+            'utilities' => 'utilities',
+            'entertainment' => 'entertainment',
+            'food' => 'food',
+            'shopping' => 'shopping',
+            'healthcare' => 'healthcare',
+            'education' => 'education',
+            'personal' => 'personal',
+            'travel' => 'travel',
+            'insurance' => 'insurance',
+            'gifts' => 'gifts',
+            'bills' => 'bills',
+            'other-expense' => 'other-expense'
+        ];
+
+        return $categoryMap[strtolower($category)] ?? 'other-expense';
+    }
 }

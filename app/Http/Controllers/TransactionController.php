@@ -10,6 +10,7 @@ use App\Models\AiLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -409,5 +410,67 @@ class TransactionController extends Controller
             'total' => $transactions->sum('amount'),
             'count' => $transactions->count(),
         ]);
+    }
+
+    /**
+     * Scan receipt image using AI
+     */
+    public function scanReceipt(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'receipt_image' => 'required|image|mimes:jpeg,jpg,png|max:5120' // 5MB max
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $validator->errors()->first()
+                ], 422);
+            }
+
+            $image = $request->file('receipt_image');
+            $imageData = base64_encode(file_get_contents($image->getRealPath()));
+            $mimeType = $image->getMimeType();
+
+            // Call Gemini API to scan receipt
+            $receiptData = $this->geminiService->scanReceipt($imageData, $mimeType);
+
+            if (!$receiptData['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $receiptData['error'] ?? 'Failed to scan receipt'
+                ], 400);
+            }
+
+            // Log AI usage
+            AiLog::create([
+                'user_id' => Auth::id(),
+                'module' => 'receipt_scanner',
+                'prompt' => 'Receipt image scan',
+                'response' => json_encode($receiptData),
+                'success' => true,
+                'metadata' => [
+                    'file_size' => $image->getSize(),
+                    'mime_type' => $mimeType
+                ]
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $receiptData
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Receipt scan error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'An error occurred while scanning the receipt'
+            ], 500);
+        }
     }
 }

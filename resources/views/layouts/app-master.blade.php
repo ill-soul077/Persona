@@ -9,6 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     @yield('additional-scripts')
     <style>
+        [x-cloak] { 
+            display: none !important; 
+        }
+        
         :root {
             --primary: #0ea5e9;
             --primary-dark: #0369a1;
