@@ -37,98 +37,149 @@
 </div>
 
 <!-- Filters -->
-<div class="glass-card rounded-xl p-6 animate-fade-in" x-data="{ 
-    clientSearch: '', 
-    typeFilter: 'all', 
-    categoryFilter: 'all',
-    dateFrom: '',
-    dateTo: ''
-}">
-    <h3 class="text-lg font-semibold text-white mb-4">Filter Transactions</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <!-- Search -->
-        <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">Search</label>
-            <input 
-                type="text" 
-                x-model="clientSearch"
-                placeholder="Search transactions..." 
-                class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+<div class="glass-card rounded-xl p-6 animate-fade-in">
+    <h3 class="text-lg font-semibold text-white mb-4 flex items-center justify-between">
+        <span>Filter Transactions</span>
+        @if(request()->hasAny(['search', 'type', 'category_id', 'start_date', 'end_date']))
+        <a href="{{ route('finance.transactions.index') }}" class="text-sm text-blue-300 hover:text-blue-200 flex items-center space-x-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            <span>Clear Filters</span>
+        </a>
+        @endif
+    </h3>
+    <form method="GET" action="{{ route('finance.transactions.index') }}" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Search -->
+            <div>
+                <label class="block text-sm font-medium text-gray-200 mb-2">Search</label>
+                <input 
+                    type="text" 
+                    name="search"
+                    value="{{ request('search') }}"
+                    placeholder="Search transactions..." 
+                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+            </div>
+
+            <!-- Type Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-200 mb-2">Type</label>
+                <select name="type" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    <option value="" class="bg-gray-800">All Types</option>
+                    <option value="income" class="bg-gray-800" {{ request('type') === 'income' ? 'selected' : '' }}>Income</option>
+                    <option value="expense" class="bg-gray-800" {{ request('type') === 'expense' ? 'selected' : '' }}>Expense</option>
+                </select>
+            </div>
+
+            <!-- Category Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-200 mb-2">Category</label>
+                <select name="category_id" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    <option value="" class="bg-gray-800">All Categories</option>
+                    @if(isset($expenseCategories))
+                        <optgroup label="Expense Categories" class="bg-gray-800">
+                            @foreach($expenseCategories as $category)
+                                <option value="{{ $category->id }}" class="bg-gray-800" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                                    {{ $category->name }}
+                                </option>
+                                @if($category->children->isNotEmpty())
+                                    @foreach($category->children as $child)
+                                        <option value="{{ $child->id }}" class="bg-gray-800" {{ request('category_id') == $child->id ? 'selected' : '' }}>
+                                            &nbsp;&nbsp;&nbsp;↳ {{ $child->name }}
+                                        </option>
+                                    @endforeach
+                                @endif
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    @if(isset($incomeSources))
+                        <optgroup label="Income Sources" class="bg-gray-800">
+                            @foreach($incomeSources as $source)
+                                <option value="{{ $source->id }}" class="bg-gray-800" {{ request('category_id') == $source->id ? 'selected' : '' }}>
+                                    {{ $source->name }}
+                                </option>
+                            @endforeach
+                        </optgroup>
+                    @endif
+                </select>
+            </div>
+
+            <!-- Date From -->
+            <div>
+                <label class="block text-sm font-medium text-gray-200 mb-2">From Date</label>
+                <input 
+                    type="date" 
+                    name="start_date"
+                    value="{{ request('start_date') }}"
+                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+            </div>
+
+            <!-- Date To -->
+            <div>
+                <label class="block text-sm font-medium text-gray-200 mb-2">To Date</label>
+                <input 
+                    type="date" 
+                    name="end_date"
+                    value="{{ request('end_date') }}"
+                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+            </div>
         </div>
 
-        <!-- Type Filter -->
-        <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">Type</label>
-            <select x-model="typeFilter" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                <option value="all" class="bg-gray-800">All Types</option>
-                <option value="income" class="bg-gray-800">Income</option>
-                <option value="expense" class="bg-gray-800">Expense</option>
-            </select>
-        </div>
-
-        <!-- Category Filter -->
-        <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">Category</label>
-            <select x-model="categoryFilter" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                <option value="all" class="bg-gray-800">All Categories</option>
-                @if(isset($categories))
-                    @foreach($categories as $category)
-                        <option value="{{ $category->id }}" class="bg-gray-800">{{ $category->name }}</option>
-                    @endforeach
+        <!-- Filter Buttons -->
+        <div class="flex items-center justify-between pt-4 border-t border-white/10">
+            <div class="text-sm text-gray-300">
+                @if($transactions->total() > 0)
+                    Showing {{ $transactions->firstItem() }} to {{ $transactions->lastItem() }} of {{ $transactions->total() }} transactions
+                @else
+                    No transactions found
                 @endif
-            </select>
+            </div>
+            <div class="flex items-center space-x-3">
+                @if(request()->hasAny(['search', 'type', 'category_id', 'start_date', 'end_date']))
+                <a href="{{ route('finance.transactions.index') }}" 
+                   class="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all">
+                    Reset
+                </a>
+                @endif
+                <button type="submit" 
+                        class="glass-button text-white px-6 py-2 rounded-xl font-medium flex items-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                    </svg>
+                    <span>Apply Filters</span>
+                </button>
+            </div>
         </div>
-
-        <!-- Date From -->
-        <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">From Date</label>
-            <input 
-                type="date" 
-                x-model="dateFrom"
-                class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-        </div>
-
-        <!-- Date To -->
-        <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">To Date</label>
-            <input 
-                type="date" 
-                x-model="dateTo"
-                class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-        </div>
-    </div>
+    </form>
 </div>
 
 <!-- Transactions Table -->
-<div class="glass-card rounded-xl overflow-hidden animate-fade-in" x-data="transactionsTable()">
+<div class="glass-card rounded-xl overflow-hidden animate-fade-in">
     @if($transactions->isNotEmpty())
     <div class="overflow-x-auto">
         <table class="min-w-full">
             <thead class="bg-white/10 backdrop-blur-sm">
                 <tr class="border-b border-white/20">
-                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" @click="sortBy('date')">
-                        Date 
-                        <span class="ml-1" x-text="sort.key==='date' ? (sort.asc ? '↑' : '↓') : '⇅'"></span>
+                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider">
+                        Date
                     </th>
-                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" @click="sortBy('type')">
-                        Type 
-                        <span class="ml-1" x-text="sort.key==='type' ? (sort.asc ? '↑' : '↓') : '⇅'"></span>
+                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider">
+                        Type
                     </th>
-                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" @click="sortBy('category')">
-                        Category 
-                        <span class="ml-1" x-text="sort.key==='category' ? (sort.asc ? '↑' : '↓') : '⇅'"></span>
+                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider">
+                        Category
                     </th>
                     <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider">Description</th>
-                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" @click="sortBy('amount')">
-                        Amount 
-                        <span class="ml-1" x-text="sort.key==='amount' ? (sort.asc ? '↑' : '↓') : '⇅'"></span>
+                    <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-200 uppercase tracking-wider">
+                        Amount
                     </th>
                     <th scope="col" class="px-6 py-4 text-right text-xs font-medium text-gray-200 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-white/10" x-ref="tbody">
+            <tbody class="divide-y divide-white/10">
                 @foreach($transactions as $transaction)
-                <tr class="hover:bg-white/5 transition-all duration-200 backdrop-blur-sm" x-show="matchesSearch($el)">
+                <tr class="hover:bg-white/5 transition-all duration-200 backdrop-blur-sm">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-white">
                             {{ $transaction->date->format('M d, Y') }}
