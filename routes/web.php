@@ -83,6 +83,12 @@ Route::middleware(['auth'])->prefix('api/chat')->name('chat.')->group(function (
 Route::middleware(['auth'])->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile.update');
+    Route::post('/settings/security', [SettingsController::class, 'updateSecurity'])->name('settings.security.update');
+    Route::post('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update');
+    Route::post('/settings/apps/connect', [SettingsController::class, 'connectApp'])->name('settings.apps.connect');
+    Route::post('/settings/apps/disconnect', [SettingsController::class, 'disconnectApp'])->name('settings.apps.disconnect');
+    Route::get('/settings/export', [SettingsController::class, 'exportData'])->name('settings.export');
 });
 
 // Authentication Routes

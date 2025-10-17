@@ -22,6 +22,18 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'phone',
+        'bio',
+        'avatar',
+        'timezone',
+        'language',
+        'date_format',
+        'two_factor_enabled',
+        'email_notifications',
+        'push_notifications',
+        'task_reminders',
+        'transaction_alerts',
+        'connected_apps',
     ];
 
     /**
@@ -44,6 +56,12 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'two_factor_enabled' => 'boolean',
+            'email_notifications' => 'boolean',
+            'push_notifications' => 'boolean',
+            'task_reminders' => 'boolean',
+            'transaction_alerts' => 'boolean',
+            'connected_apps' => 'array',
         ];
     }
 
