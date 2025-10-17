@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 
 class SettingsController extends Controller
@@ -14,15 +16,19 @@ class SettingsController extends Controller
      */
     public function index()
     {
+        /** @var User $user */
         $user = Auth::user();
-        return view('settings.index', compact('user'));
+        
+        return view('settings.index', [
+            'user' => $user
+        ]);
     }
-
     /**
      * Update profile information.
      */
     public function updateProfile(Request $request)
     {
+        /** @var User $user */
         $user = Auth::user();
         
         $validated = $request->validate([
@@ -45,6 +51,7 @@ class SettingsController extends Controller
      */
     public function updateSecurity(Request $request)
     {
+        /** @var User $user */
         $user = Auth::user();
 
         $validated = $request->validate([
@@ -75,6 +82,7 @@ class SettingsController extends Controller
      */
     public function updateNotifications(Request $request)
     {
+        /** @var User $user */
         $user = Auth::user();
 
         $user->update([
@@ -88,10 +96,11 @@ class SettingsController extends Controller
     }
 
     /**
-     * Connect an external app.
+     * Connect third-party app.
      */
     public function connectApp(Request $request)
     {
+        /** @var User $user */
         $user = Auth::user();
         
         $validated = $request->validate([
@@ -118,6 +127,7 @@ class SettingsController extends Controller
      */
     public function disconnectApp(Request $request)
     {
+        /** @var User $user */
         $user = Auth::user();
         
         $validated = $request->validate([
@@ -141,6 +151,7 @@ class SettingsController extends Controller
      */
     public function exportData()
     {
+        /** @var User $user */
         $user = Auth::user();
         
         $data = [
@@ -156,3 +167,4 @@ class SettingsController extends Controller
             ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
     }
 }
+
