@@ -15,6 +15,7 @@
 @endsection
 
 @section('content')
+<div x-data="transactionForm({{ isset($transaction) ? json_encode($transaction) : 'null' }})" x-init="init()">
 <!-- Page Header -->
 <div class="glass-card rounded-xl p-6 animate-fade-in">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
@@ -154,9 +155,7 @@
 <div class="glass-card rounded-xl p-6 animate-fade-in">
         <form method="POST" 
               action="{{ isset($transaction) ? route('finance.transactions.update', $transaction) : route('finance.transactions.store') }}"
-              enctype="multipart/form-data"
-              x-data="transactionForm({{ isset($transaction) ? json_encode($transaction) : 'null' }})"
-              x-init="init()">
+              enctype="multipart/form-data">
             @csrf
             @if(isset($transaction))
                 @method('PUT')
@@ -330,6 +329,7 @@
             </div>
         </form>
 </div>
+</div><!-- End Alpine.js wrapper -->
 @endsection
 
 @section('additional-scripts')
@@ -430,7 +430,9 @@ function transactionForm(existing = null) {
                 const result = await response.json();
 
                 if (!response.ok || !result.success) {
-                    throw new Error(result.error || 'Failed to scan receipt');
+                    // Show debug message if available (only in debug mode)
+                    const errorMsg = result.debug_message || result.error || 'Failed to scan receipt';
+                    throw new Error(errorMsg);
                 }
 
                 this.receiptData = result.data;

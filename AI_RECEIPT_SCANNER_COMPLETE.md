@@ -82,7 +82,7 @@ An **AI-powered receipt scanner** that uses Google's Gemini 1.5 Flash API to aut
 ### API Details
 - **Provider**: Google Gemini
 - **Model**: gemini-1.5-flash
-- **API Key**: AIzaSyDCqTGpqjAg_kloatcccju80uHSrVLhbYg
+- **API Key**: AIzaSyCg2151c78yrL6aXmbEeeUJ4oKSHfn7QfA
 - **Temperature**: 0.2 (consistent results)
 - **Timeout**: 30 seconds
 

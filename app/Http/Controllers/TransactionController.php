@@ -434,27 +434,38 @@ class TransactionController extends Controller
             $mimeType = $image->getMimeType();
 
             // Call Gemini API to scan receipt
+            Log::info('Calling Gemini API for receipt scan', [
+                'mime_type' => $mimeType,
+                'image_size' => strlen($imageData)
+            ]);
+            
             $receiptData = $this->geminiService->scanReceipt($imageData, $mimeType);
+            
+            Log::info('Gemini API response received', [
+                'success' => $receiptData['success'] ?? false,
+                'has_error' => isset($receiptData['error']),
+                'error' => $receiptData['error'] ?? null
+            ]);
 
             if (!$receiptData['success']) {
                 return response()->json([
                     'success' => false,
-                    'error' => $receiptData['error'] ?? 'Failed to scan receipt'
+                    'error' => $receiptData['error'] ?? 'Failed to scan receipt',
+                    'debug_message' => $receiptData['debug_message'] ?? null
                 ], 400);
             }
 
             // Log AI usage
-            AiLog::create([
-                'user_id' => Auth::id(),
-                'module' => 'receipt_scanner',
-                'prompt' => 'Receipt image scan',
-                'response' => json_encode($receiptData),
-                'success' => true,
-                'metadata' => [
-                    'file_size' => $image->getSize(),
-                    'mime_type' => $mimeType
-                ]
-            ]);
+                // Log AI usage for auditing (reuses existing finance module enum)
+                AiLog::create([
+                    'user_id' => Auth::id(),
+                    'module' => 'finance',
+                    'raw_text' => json_encode($receiptData),
+                    'parsed_json' => $receiptData,
+                    'model' => 'gemini-2.0-flash',
+                    'status' => 'parsed',
+                    'ip_address' => $request->ip(),
+                ]);
 
             return response()->json([
                 'success' => true,

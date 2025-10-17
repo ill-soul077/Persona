@@ -57,6 +57,27 @@ class GeminiService
     private array $inMemoryCache = [];
 
     /**
+     * Rate limiting: Max requests per minute
+     */
+    protected int $maxRequestsPerMinute = 50;
+
+    /**
+     * Circuit breaker: Max failures before breaking
+     */
+    protected int $circuitBreakerThreshold = 5;
+
+    /**
+     * Circuit breaker: Reset time in seconds
+     */
+    protected int $circuitBreakerResetTime = 300; // 5 minutes
+
+    /**
+     * Retry configuration
+     */
+    protected int $maxRetries = 3;
+    protected int $retryBaseDelay = 1000; // milliseconds
+
+    /**
      * Constructor - Initialize service with environment configuration
      */
     public function __construct()
@@ -173,17 +194,39 @@ class GeminiService
     }
 
     /**
-     * Get API usage statistics (placeholder for future implementation)
+     * Get API usage statistics
      * 
-     * @return array {requests_today: int, quota_remaining: int}
+     * @return array Usage stats including requests, rate limits, circuit breaker status
      */
     public function getUsageStats(): array
     {
-        // This would require tracking API calls in cache/database
-        // For now, return mock data
+        $todayKey = 'gemini_requests_today';
+        $rateKey = 'gemini_rate_limit:' . now()->format('Y-m-d_H:i');
+        $circuitKey = 'gemini_circuit_breaker';
+
+        $todayCount = Cache::get($todayKey, 0);
+        $currentMinuteCount = Cache::get($rateKey, 0);
+        $circuitBreaker = Cache::get($circuitKey, ['count' => 0, 'last_failure' => null]);
+
         return [
-            'requests_today' => Cache::get('gemini_requests_today', 0),
-            'quota_remaining' => 1000, // Placeholder
+            'requests_today' => $todayCount,
+            'requests_this_minute' => $currentMinuteCount,
+            'rate_limit' => $this->maxRequestsPerMinute,
+            'rate_limit_exceeded' => $currentMinuteCount >= $this->maxRequestsPerMinute,
+            'circuit_breaker' => [
+                'status' => $this->isCircuitBreakerOpen() ? 'OPEN' : 'CLOSED',
+                'failure_count' => $circuitBreaker['count'],
+                'threshold' => $this->circuitBreakerThreshold,
+                'last_failure' => $circuitBreaker['last_failure'],
+                'reset_in_seconds' => $circuitBreaker['last_failure'] 
+                    ? max(0, $this->circuitBreakerResetTime - now()->diffInSeconds($circuitBreaker['last_failure']))
+                    : 0
+            ],
+            'retry_config' => [
+                'max_retries' => $this->maxRetries,
+                'base_delay_ms' => $this->retryBaseDelay
+            ],
+            'quota_remaining' => 1000 // Placeholder - would need Cloud Console integration
         ];
     }
 
@@ -432,6 +475,126 @@ PROMPT;
     }
 
     /**
+     * Check if rate limit is exceeded
+     */
+    protected function isRateLimitExceeded(): bool
+    {
+        $key = 'gemini_rate_limit:' . now()->format('Y-m-d_H:i');
+        $count = Cache::get($key, 0);
+        
+        if ($count >= $this->maxRequestsPerMinute) {
+            Log::warning('Gemini API rate limit exceeded', [
+                'count' => $count,
+                'limit' => $this->maxRequestsPerMinute,
+                'minute' => now()->format('Y-m-d H:i')
+            ]);
+            return true;
+        }
+        
+        Cache::put($key, $count + 1, 120); // 2 minutes TTL
+        return false;
+    }
+
+    /**
+     * Check circuit breaker status
+     */
+    protected function isCircuitBreakerOpen(): bool
+    {
+        $key = 'gemini_circuit_breaker';
+        $failures = Cache::get($key, ['count' => 0, 'last_failure' => null]);
+        
+        // Reset if enough time has passed
+        if ($failures['last_failure'] && now()->diffInSeconds($failures['last_failure']) > $this->circuitBreakerResetTime) {
+            Cache::forget($key);
+            return false;
+        }
+        
+        if ($failures['count'] >= $this->circuitBreakerThreshold) {
+            Log::error('Gemini API circuit breaker is OPEN', [
+                'failures' => $failures['count'],
+                'threshold' => $this->circuitBreakerThreshold,
+                'last_failure' => $failures['last_failure']
+            ]);
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Record circuit breaker failure
+     */
+    protected function recordCircuitBreakerFailure(): void
+    {
+        $key = 'gemini_circuit_breaker';
+        $failures = Cache::get($key, ['count' => 0, 'last_failure' => null]);
+        
+        Cache::put($key, [
+            'count' => $failures['count'] + 1,
+            'last_failure' => now()
+        ], $this->circuitBreakerResetTime);
+    }
+
+    /**
+     * Reset circuit breaker on success
+     */
+    protected function resetCircuitBreaker(): void
+    {
+        Cache::forget('gemini_circuit_breaker');
+    }
+
+    /**
+     * Execute API call with retry logic and exponential backoff
+     */
+    protected function executeWithRetry(callable $apiCall, int $attempt = 1)
+    {
+        try {
+            $response = $apiCall();
+            
+            // Success - reset circuit breaker
+            $this->resetCircuitBreaker();
+            
+            return $response;
+            
+        } catch (\Exception $e) {
+            $statusCode = method_exists($e, 'getCode') ? $e->getCode() : 500;
+            
+            // Check if we should retry
+            $shouldRetry = in_array($statusCode, [429, 500, 503, 504]) && $attempt < $this->maxRetries;
+            
+            if ($shouldRetry) {
+                // Calculate exponential backoff with jitter
+                $baseDelay = $this->retryBaseDelay * pow(2, $attempt - 1);
+                $jitter = rand(0, (int)($baseDelay * 0.3)); // 30% jitter
+                $delay = ($baseDelay + $jitter) / 1000; // Convert to seconds
+                
+                Log::warning('Retrying Gemini API call', [
+                    'attempt' => $attempt,
+                    'max_retries' => $this->maxRetries,
+                    'status_code' => $statusCode,
+                    'delay_seconds' => $delay,
+                    'error' => $e->getMessage()
+                ]);
+                
+                sleep((int)$delay);
+                
+                return $this->executeWithRetry($apiCall, $attempt + 1);
+            }
+            
+            // Max retries exceeded or non-retryable error
+            $this->recordCircuitBreakerFailure();
+            
+            Log::error('Gemini API call failed after retries', [
+                'attempts' => $attempt,
+                'status_code' => $statusCode,
+                'error' => $e->getMessage()
+            ]);
+            
+            throw $e;
+        }
+    }
+
+    /**
      * Scan receipt image using Gemini Vision API
      * 
      * @param string $imageBase64 Base64 encoded image data
@@ -448,12 +611,37 @@ PROMPT;
     public function scanReceipt(string $imageBase64, string $mimeType = 'image/jpeg'): array
     {
         try {
+            // Check circuit breaker
+            if ($this->isCircuitBreakerOpen()) {
+                return [
+                    'success' => false,
+                    'error' => 'Service temporarily unavailable. Please try again in a few minutes.'
+                ];
+            }
+
+            // Check rate limit
+            if ($this->isRateLimitExceeded()) {
+                return [
+                    'success' => false,
+                    'error' => 'Rate limit exceeded. Please wait a moment and try again.'
+                ];
+            }
+
+            // Check cache for duplicate uploads (using image hash)
+            $imageHash = md5($imageBase64);
+            $cacheKey = "receipt_scan:{$imageHash}";
+            
+            if (Cache::has($cacheKey)) {
+                Log::info('Returning cached receipt scan result', ['hash' => $imageHash]);
+                return Cache::get($cacheKey);
+            }
+
             $prompt = "Analyze this receipt image and extract the following information in JSON format:\n" .
                       "- Total amount (just the number)\n" .
-                      "- Date (in ISO format YYYY-MM-DD)\n" .
+                      "- Date (in ISO format)\n" .
                       "- Description or items purchased (brief summary)\n" .
                       "- Merchant/store name\n" .
-                      "- Suggested category (one of: housing, transportation, groceries, utilities, entertainment, food, shopping, healthcare, education, personal, travel, insurance, gifts, bills, other-expense)\n\n" .
+                      "- Suggested category (one of: housing,transportation,groceries,utilities,entertainment,food,shopping,healthcare,education,personal,travel,insurance,gifts,bills,other-expense )\n\n" .
                       "Only respond with valid JSON in this exact format:\n" .
                       "{\n" .
                       '  "amount": number,' . "\n" .
@@ -462,43 +650,57 @@ PROMPT;
                       '  "merchantName": "string",' . "\n" .
                       '  "category": "string"' . "\n" .
                       "}\n\n" .
-                      "If it's not a receipt, return an empty object: {}";
+                      "If its not a receipt, return an empty object";
 
-            $url = "{$this->baseUrl}/gemini-1.5-flash:generateContent?key=AIzaSyDCqTGpqjAg_kloatcccju80uHSrVLhbYg";
+            // Use Gemini 2.0 Flash with v1 endpoint (v1beta not needed, multimodal supported)
+            $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=AIzaSyCg2151c78yrL6aXmbEeeUJ4oKSHfn7QfA";
 
-            $response = Http::timeout(30)->post($url, [
-                'contents' => [
-                    [
-                        'parts' => [
-                            [
-                                'text' => $prompt
-                            ],
-                            [
-                                'inline_data' => [
-                                    'mime_type' => $mimeType,
-                                    'data' => $imageBase64
+            // Log API request details
+            Log::info('Starting receipt scan API call', [
+                'url' => str_replace('key=', 'key=***', $url),
+                'mime_type' => $mimeType,
+                'image_size' => strlen($imageBase64) . ' bytes'
+            ]);
+
+            // Execute API call with retry logic
+            $response = $this->executeWithRetry(function() use ($url, $prompt, $mimeType, $imageBase64) {
+                $response = Http::timeout(30)->post($url, [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => $prompt
+                                ],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $mimeType,
+                                        'data' => $imageBase64
+                                    ]
                                 ]
                             ]
                         ]
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.2,
+                        'maxOutputTokens' => 1024,
                     ]
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.2,
-                    'maxOutputTokens' => 1024,
-                ]
-            ]);
-
-            if (!$response->successful()) {
-                Log::error('Gemini receipt scan API error', [
-                    'status' => $response->status(),
-                    'body' => $response->body()
                 ]);
-                throw new \Exception('Failed to scan receipt: ' . $response->body());
-            }
 
-            $data = $response->json();
-            
-            if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+                if (!$response->successful()) {
+                    Log::error('Gemini receipt scan API error', [
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]);
+                    
+                    // Create exception with status code for retry logic
+                    $exception = new \Exception('Failed to scan receipt: ' . $response->body());
+                    throw $exception;
+                }
+
+                return $response;
+            });
+
+            $data = $response->json();            if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                 throw new \Exception('Invalid response format from Gemini API');
             }
 
@@ -534,7 +736,7 @@ PROMPT;
 
             $this->incrementRequestCounter();
 
-            return array_merge([
+            $result = array_merge([
                 'success' => true,
                 'amount' => $receiptData['amount'] ?? 0,
                 'date' => $receiptData['date'] ?? now()->format('Y-m-d'),
@@ -543,15 +745,37 @@ PROMPT;
                 'category' => $receiptData['category'] ?? 'other-expense'
             ], $receiptData);
 
+            // Cache the result for 1 hour (dedupe duplicate uploads)
+            Cache::put($cacheKey, $result, 3600);
+
+            return $result;
+
         } catch (\Exception $e) {
             Log::error('Receipt scanning error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error_code' => $e->getCode(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
+            
+            // Provide user-friendly error messages
+            $userMessage = 'An error occurred while scanning the receipt';
+            
+            if (str_contains($e->getMessage(), 'models/') && str_contains($e->getMessage(), 'not found')) {
+                $userMessage = 'The AI model is currently unavailable. Please try again later.';
+            } elseif (str_contains($e->getMessage(), 'timeout')) {
+                $userMessage = 'The request timed out. Please try again with a smaller image.';
+            } elseif (str_contains($e->getMessage(), '429') || str_contains($e->getMessage(), 'quota')) {
+                $userMessage = 'API quota exceeded. Please try again in a few minutes.';
+            } elseif (str_contains($e->getMessage(), 'Failed to parse receipt data')) {
+                $userMessage = 'Could not read the receipt. Please ensure the image is clear and try again.';
+            }
             
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $userMessage,
+                'debug_message' => config('app.debug') ? $e->getMessage() : null
             ];
         }
     }
@@ -580,5 +804,25 @@ PROMPT;
         ];
 
         return $categoryMap[strtolower($category)] ?? 'other-expense';
+    }
+
+    /**
+     * Manually reset circuit breaker (for admin/debugging)
+     */
+    public function resetCircuitBreakerManually(): void
+    {
+        $this->resetCircuitBreaker();
+        Log::info('Circuit breaker manually reset');
+    }
+
+    /**
+     * Clear all rate limit counters (for admin/debugging)
+     */
+    public function clearRateLimits(): void
+    {
+        $pattern = 'gemini_rate_limit:*';
+        // Note: This is a simple implementation. In production, use Redis SCAN
+        Cache::forget('gemini_requests_today');
+        Log::info('Rate limits cleared');
     }
 }

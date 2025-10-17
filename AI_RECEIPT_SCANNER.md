@@ -44,7 +44,7 @@ Click "✅ Apply to Form" to auto-fill the transaction form with the extracted d
 ## Technical Details
 
 ### API Configuration
-- **API Key**: `AIzaSyDCqTGpqjAg_kloatcccju80uHSrVLhbYg`
+- **API Key**: `AIzaSyCg2151c78yrL6aXmbEeeUJ4oKSHfn7QfA`
 - **Model**: `gemini-1.5-flash`
 - **Temperature**: 0.2 (low for consistent results)
 - **Max Tokens**: 1024
