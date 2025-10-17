@@ -53,10 +53,16 @@ class DashboardController extends Controller
         // Trends (last 7 days)
         $weeklyTrend = $this->getWeeklyTrend($userId);
         
+        // Alias variables for view compatibility
+        $totalIncome = $monthlyIncome;
+        $totalExpenses = $monthlyExpenses;
+        
         return view('dashboard', compact(
             'balance',
             'monthlyExpenses',
             'monthlyIncome',
+            'totalIncome',
+            'totalExpenses',
             'tasksDueToday',
             'tasksOverdue',
             'tasksCompleted',
