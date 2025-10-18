@@ -18,6 +18,7 @@ Route::get('/', function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart.data');
+    Route::post('/dashboard/budget/refresh', [DashboardController::class, 'refreshBudgetSummary'])->name('dashboard.budget.refresh');
     
     // Chatbot Routes
     Route::get('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'index'])->name('chatbot');
@@ -37,6 +38,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [TransactionController::class, 'dashboard'])->name('dashboard');
+    Route::post('/dashboard/budget/refresh', [DashboardController::class, 'refreshBudgetSummary'])->name('dashboard.budget.refresh');
     
     // Transactions CRUD
     Route::resource('transactions', TransactionController::class);

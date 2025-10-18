@@ -5,8 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\Task;
 use App\Models\AiLog;
+use App\Models\Budget;
+use App\Models\BudgetSummary;
+use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -16,7 +21,8 @@ class DashboardController extends Controller
      */
     public function index()
     {
-        $userId = auth()->id();
+    /** @var \App\Models\User|null $authUser */
+    $userId = Auth::id();
         
         // Financial Summary
         $balance = $this->getBalance($userId);
@@ -54,7 +60,9 @@ class DashboardController extends Controller
         $weeklyTrend = $this->getWeeklyTrend($userId);
         
         // Current month's budget
-        $currentBudget = auth()->user()->currentBudget();
+    /** @var \App\Models\User|null $authUser */
+    $authUser = Auth::user();
+    $currentBudget = $authUser ? $authUser->currentBudget() : null;
         $budgetData = null;
         
         if ($currentBudget) {
@@ -66,6 +74,18 @@ class DashboardController extends Controller
                 'status' => $currentBudget->status_color,
                 'is_exceeded' => $currentBudget->isExceeded(),
             ];
+        }
+
+        // Load existing AI budget summary from DB if available
+        if ($authUser) {
+            $monthDate = sprintf('%04d-%02d-01', now()->year, now()->month);
+            $existingSummary = BudgetSummary::where('user_id', $authUser->id)
+                ->where('month', $monthDate)
+                ->first();
+            
+            if ($existingSummary && $existingSummary->isFresh()) {
+                session()->flash('budget_ai_summary', $existingSummary->summary_data);
+            }
         }
         
         // Alias variables for view compatibility
@@ -88,6 +108,167 @@ class DashboardController extends Controller
             'weeklyTrend',
             'budgetData'
         ));
+    }
+
+    /**
+     * Refresh the monthly budget AI summary using Gemini and redirect back.
+     * Implements DB caching, throttling (1/hour per user), and smart fallback.
+     */
+    public function refreshBudgetSummary(Request $request, GeminiService $gemini)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $year = now()->year;
+        $month = now()->month;
+        $monthDate = sprintf('%04d-%02d-01', $year, $month);
+
+        // Check if we have a recent summary in DB (within last hour = throttle)
+        $existingSummary = BudgetSummary::where('user_id', $user->id)
+            ->where('month', $monthDate)
+            ->first();
+
+        if ($existingSummary && $existingSummary->updated_at->diffInMinutes(now()) < 60) {
+            // Throttle: don't regenerate if refreshed < 1 hour ago
+            Log::info('Budget summary throttled - using cached DB result', [
+                'user_id' => $user->id,
+                'month' => $monthDate,
+                'age_minutes' => $existingSummary->updated_at->diffInMinutes(now())
+            ]);
+            
+            $data = $existingSummary->summary_data;
+            if ($existingSummary->is_fallback) {
+                $data['fallback'] = true;
+            }
+            
+            return back()->with([
+                'budget_ai_summary' => $data,
+                'budget_ai_summary_throttled' => true
+            ]);
+        }
+
+        // Gather current month context
+        $budget = $user->budgets()->whereYear('month', $year)->whereMonth('month', $month)->first();
+
+        $spentThisMonth = DB::table('transactions')
+            ->where('user_id', $user->id)
+            ->where('type', 'expense')
+            ->whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->sum('amount');
+
+        $incomeThisMonth = DB::table('transactions')
+            ->where('user_id', $user->id)
+            ->where('type', 'income')
+            ->whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->sum('amount');
+
+        $daysLeft = now()->endOfMonth()->diffInDays(now());
+
+        // Category breakdown for advice context
+        $categoryBreakdown = DB::table('transactions as t')
+            ->leftJoin('expense_categories as c', 't.category_id', '=', 'c.id')
+            ->selectRaw("COALESCE(c.name, 'Uncategorized') as category, SUM(t.amount) as total")
+            ->where('t.user_id', $user->id)
+            ->where('t.type', 'expense')
+            ->whereYear('t.date', $year)
+            ->whereMonth('t.date', $month)
+            ->groupBy('category')
+            ->orderByDesc('total')
+            ->pluck('total', 'category')
+            ->toArray();
+
+        $context = [
+            'month_name' => now()->format('F Y'),
+            'currency' => $budget->currency ?? 'BDT',
+            'budget_amount' => (float) ($budget->amount ?? 0),
+            'total_spent' => (float) $spentThisMonth,
+            'remaining' => (float) (($budget->amount ?? 0) - $spentThisMonth),
+            'days_left' => $daysLeft,
+            'income' => (float) $incomeThisMonth,
+            'category_breakdown' => $categoryBreakdown,
+        ];
+
+        try {
+            // Set a hard timeout for AI generation to prevent PHP execution limit
+            set_time_limit(40); // 40s max for this operation
+            
+            $advice = $gemini->generateBudgetAdvice($context);
+            $modelUsed = $this->getGeminiModelName($gemini);
+            $isFallback = !empty($advice['fallback']);
+
+            // Save or update in DB
+            BudgetSummary::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'month' => $monthDate,
+                ],
+                [
+                    'summary_data' => $advice,
+                    'model_used' => $modelUsed,
+                    'is_fallback' => $isFallback,
+                ]
+            );
+
+            // Log the AI interaction only if not fallback
+            if (!$isFallback) {
+                AiLog::create([
+                    'user_id' => $user->id,
+                    'module' => 'finance',
+                    'raw_text' => json_encode($context),
+                    'parsed_json' => $advice,
+                    'model' => $modelUsed,
+                    'status' => 'parsed',
+                    'ip_address' => $request->ip(),
+                ]);
+            }
+
+            Log::info('Budget summary generated', [
+                'user_id' => $user->id,
+                'model' => $modelUsed,
+                'is_fallback' => $isFallback
+            ]);
+
+            return back()->with('budget_ai_summary', $advice);
+        } catch (\Throwable $e) {
+            Log::error('Budget summary generation failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'error_type' => get_class($e)
+            ]);
+            
+            // On timeout or any failure, use heuristic fallback
+            if (str_contains($e->getMessage(), 'Maximum execution time') || 
+                str_contains($e->getMessage(), 'timeout')) {
+                Log::warning('Timeout detected, using heuristic fallback');
+                
+                $fallback = app(GeminiService::class)->generateHeuristicBudgetAdvice($context);
+                
+                BudgetSummary::updateOrCreate(
+                    ['user_id' => $user->id, 'month' => $monthDate],
+                    ['summary_data' => $fallback, 'model_used' => 'heuristic-fallback', 'is_fallback' => true]
+                );
+                
+                return back()->with('budget_ai_summary', $fallback);
+            }
+            
+            return back()->with('budget_ai_summary_error', $e->getMessage());
+        } finally {
+            // Reset time limit
+            set_time_limit(60);
+        }
+    }
+
+    private function getGeminiModelName(GeminiService $g): string
+    {
+        try {
+            $ref = new \ReflectionClass($g);
+            $prop = $ref->getProperty('model');
+            $prop->setAccessible(true);
+            return (string) $prop->getValue($g);
+        } catch (\Throwable $e) {
+            return 'unknown-model';
+        }
     }
     
     /**
@@ -216,7 +397,7 @@ class DashboardController extends Controller
      */
     public function chartData(Request $request)
     {
-        $userId = auth()->id();
+    $userId = Auth::id();
         $type = $request->get('type', 'expense-distribution');
         
         switch ($type) {

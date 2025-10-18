@@ -82,14 +82,29 @@ class GeminiService
      */
     public function __construct()
     {
-        $this->baseUrl = 'https://generativelanguage.googleapis.com/v1/models';
-        $this->apiKey = 'AIzaSyBmX9e8OozSX8NAWwOa8094OM-9eNZGY-8';
-        $this->model = 'gemini-2.5-flash';
+        // Prefer config/env but safely fallback to provided key
+        $this->baseUrl = rtrim((string) config('services.gemini.base_url', 'https://generativelanguage.googleapis.com/v1'), '/');
+        $this->apiKey = (string) config('services.gemini.api_key', env('GEMINI_API_KEY', 'AIzaSyD9LGmUfyUMp72oD88RGSyaDXsX1FDjbUc'));
+        $this->model = (string) config('services.gemini.model', env('GEMINI_MODEL', 'gemini-2.5-flash'));
         $this->maxTokens = (int) config('services.gemini.max_tokens', env('GEMINI_MAX_TOKENS', 1024));
-        $this->temperature = (float) config('services.gemini.temperature', env('GEMINI_TEMPERATURE', 0.7));
-    }
+        $this->temperature = (float) config('services.gemini.temperature', env('GEMINI_TEMPERATURE', 0.5));
 
-    /**
+        Log::info('GeminiService initialized', [
+            'default_model' => $this->model,
+            'base_url' => $this->baseUrl
+        ]);
+
+        // Try to detect an available free model if not reachable; fallback sequence
+        try {
+            $detected = $this->findBestAvailableModel();
+            if ($detected) {
+                $this->model = $detected;
+                Log::info('GeminiService detected available model', ['selected_model' => $this->model]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Gemini model discovery failed, using default', ['error' => $e->getMessage(), 'default_model' => $this->model]);
+        }
+    }    /**
      * Parse natural language finance input into structured data
      * 
      * @param string $rawText e.g., "spent 25 on coffee at Starbucks downtown"
@@ -316,29 +331,288 @@ PROMPT;
      */
     protected function callGeminiAPI(string $prompt): array
     {
-        $url = "{$this->baseUrl}/{$this->model}:generateContent?key={$this->apiKey}";
-        
-        $response = Http::timeout(15)
-            ->withHeaders(['Content-Type' => 'application/json'])
-            ->post($url, [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $prompt]
-                        ]
-                    ]
-                ],
-                'generationConfig' => [
-                    'temperature' => $this->temperature,
-                    'maxOutputTokens' => $this->maxTokens,
-                ],
-            ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('Gemini API request failed: ' . $response->body());
+        // Circuit breaker & local rate limit (protect against spamming)
+        if ($this->isCircuitBreakerOpen()) {
+            throw new \Exception('Gemini API temporarily unavailable (circuit open). Please try again shortly.', 503);
+        }
+        if ($this->isRateLimitExceeded()) {
+            throw new \Exception('Local rate limit exceeded for AI calls. Please wait a moment and retry.', 429);
         }
 
+        $url = "{$this->baseUrl}/models/{$this->model}:generateContent?key={$this->apiKey}";
+
+        // Wrap with retry/backoff to handle transient 429/5xx
+        // Set HTTP timeout to 25s to prevent individual requests from hanging
+        $response = $this->executeWithRetry(function () use ($url, $prompt) {
+            $resp = Http::timeout(25)
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post($url, [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $prompt]
+                            ]
+                        ]
+                    ],
+                    'generationConfig' => [
+                        'temperature' => $this->temperature,
+                        'maxOutputTokens' => $this->maxTokens,
+                    ],
+                ]);
+
+            if (!$resp->successful()) {
+                // Bubble up with HTTP status code for retry logic
+                throw new \Exception('Gemini API request failed: ' . $resp->body(), $resp->status());
+            }
+
+            return $resp;
+        });
+
+        // Track quota usage locally
+        $this->incrementRequestCounter();
+
         return $response->json();
+    }
+
+    /**
+     * Attempt to find the best available free model.
+     * Preference order: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-flash-8b
+     */
+    protected function findBestAvailableModel(): ?string
+    {
+        try {
+            $resp = Http::timeout(8)->get($this->baseUrl . '/models', [ 'key' => $this->apiKey ]);
+            if (!$resp->successful()) return null;
+            $data = $resp->json();
+            $models = collect($data['models'] ?? [])->pluck('name')->map(function ($n) {
+                // names can be like models/gemini-2.0-flash
+                return str_contains($n, '/') ? explode('/', $n)[1] : $n;
+            });
+            // Prefer newest/aliases first, then older fallbacks
+            $prefs = [
+                'gemini-2.5-flash',
+                'gemini-flash-latest',
+                'gemini-2.5-flash-lite',
+                'gemini-2.0-flash',
+                'gemini-1.5-flash',
+                'gemini-1.5-flash-8b'
+            ];
+            foreach ($prefs as $m) {
+                if ($models->contains($m)) return $m;
+            }
+            // last resort keep current
+            return null;
+        } catch (\Throwable $e) {
+            Log::info('Model listing failed, skipping detection', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Generate budget guidance and summary from the provided context.
+     * Note: Caching is now handled at the controller/DB level to reduce API calls.
+     * @param array $context
+     * @return array{summary:string, recommendations:array, suggestedAllocations:array, risks:array}
+     */
+    public function generateBudgetAdvice(array $context): array
+    {
+        try {
+            Log::info('Generating budget advice', [
+                'model' => $this->model,
+                'month' => $context['month_name'] ?? 'unknown'
+            ]);
+            
+            $prompt = $this->buildBudgetAdvicePrompt($context);
+            $response = $this->callGeminiAPI($prompt);
+            
+            // Check if response was truncated due to MAX_TOKENS
+            $finishReason = $response['candidates'][0]['finishReason'] ?? '';
+            if ($finishReason === 'MAX_TOKENS') {
+                Log::warning('Gemini response truncated due to MAX_TOKENS, using heuristic fallback', [
+                    'model' => $this->model,
+                    'thoughts_tokens' => $response['usageMetadata']['thoughtsTokenCount'] ?? 0
+                ]);
+                return $this->generateHeuristicBudgetAdvice($context);
+            }
+            
+            // Log full response structure for debugging
+            Log::debug('Gemini API full response', [
+                'response_keys' => array_keys($response),
+                'candidates_count' => count($response['candidates'] ?? []),
+                'finish_reason' => $finishReason
+            ]);
+            
+            $text = $response['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            
+            // Clean up markdown code blocks and any extra whitespace
+            $text = preg_replace('/```json\s*|```/i', '', $text);
+            $text = trim($text);
+            
+            // Log raw response for debugging
+            Log::debug('Gemini budget advice raw response', [
+                'length' => strlen($text),
+                'preview' => substr($text, 0, 200)
+            ]);
+            
+            $data = json_decode($text, true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+                Log::error('JSON decode failed', [
+                    'error' => json_last_error_msg(),
+                    'raw_text_preview' => substr($text, 0, 500)
+                ]);
+                throw new \RuntimeException('Invalid JSON from Gemini for budget advice: ' . json_last_error_msg());
+            }
+            
+            Log::info('Budget advice generated successfully', ['model' => $this->model]);
+            return $data;
+        } catch (\Exception $e) {
+            // If quota exhausted or rate limited, provide a graceful heuristic fallback
+            if (str_contains(strtolower($e->getMessage()), 'quota') || $e->getCode() === 429) {
+                Log::warning('Using local fallback for budget advice due to quota/rate limit', [
+                    'error' => substr($e->getMessage(), 0, 200),
+                    'attempted_model' => $this->model
+                ]);
+                return $this->generateHeuristicBudgetAdvice($context);
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Build the prompt for budget advice using provided context
+     */
+    protected function buildBudgetAdvicePrompt(array $ctx): string
+    {
+        $monthName = $ctx['month_name'] ?? now()->format('F Y');
+        $budget = number_format((float)($ctx['budget_amount'] ?? 0), 2);
+        $spent = number_format((float)($ctx['total_spent'] ?? 0), 2);
+        $remaining = number_format((float)($ctx['remaining'] ?? 0), 2);
+        $daysLeft = (int) ($ctx['days_left'] ?? 0);
+        $currency = $ctx['currency'] ?? 'BDT';
+        $categoryBreakdown = json_encode($ctx['category_breakdown'] ?? [], JSON_UNESCAPED_UNICODE);
+
+        return <<<PROMPT
+You are a personal finance coach. Create a clear, actionable monthly budget summary and guidance.
+
+Return ONLY valid JSON with this shape (no markdown, no commentary):
+{
+  "summary": string,                      // concise 2-3 sentences overview
+  "recommendations": [                   // concrete, prioritized suggestions
+    { "title": string, "detail": string }
+  ],
+  "suggestedAllocations": [              // how to spend remaining budget across categories
+    { "category": string, "amount": number, "reason": string }
+  ],
+  "risks": [                             // pitfalls to avoid this month
+    string
+  ]
+}
+
+CONTEXT:
+Month: {$monthName}
+Currency: {$currency}
+Budget amount: {$budget}
+Total spent: {$spent}
+Remaining: {$remaining}
+Days left in month: {$daysLeft}
+Category breakdown (spent so far): {$categoryBreakdown}
+
+Guidelines:
+- Be pragmatic and frugal; keep advice specific to the user's spending pattern.
+- Suggested allocations should sum to <= Remaining and reflect typical needs (groceries, transport, bills, savings, discretionary).
+- If over budget or near limit, focus on cost control and must-have categories only.
+- Keep text short and scannable.
+PROMPT;
+    }
+
+    /**
+     * Heuristic fallback when Gemini quota/rate limit blocks the request.
+     * Provides reasonable, deterministic guidance based on remaining/spent and common categories.
+     * Public method so controller can call directly on timeout.
+     */
+    public function generateHeuristicBudgetAdvice(array $ctx): array
+    {
+        $remaining = (float) ($ctx['remaining'] ?? 0);
+        $spent = (float) ($ctx['total_spent'] ?? 0);
+        $budget = (float) ($ctx['budget_amount'] ?? 0);
+        $daysLeft = max(1, (int) ($ctx['days_left'] ?? 1));
+        $currency = $ctx['currency'] ?? 'BDT';
+        $monthName = $ctx['month_name'] ?? now()->format('F Y');
+        $perDay = $remaining / $daysLeft;
+
+        $summary = $budget > 0
+            ? sprintf('For %s, you have %s %.2f remaining out of %.2f (spent %.2f). That is ~%s %.2f per day for the next %d days.', $monthName, $currency, $remaining, $budget, $spent, $currency, $perDay, $daysLeft)
+            : sprintf('For %s, no budget is set. You have spent %s %.2f so far.', $monthName, $currency, $spent);
+
+        // Default allocation ratios (only if remaining > 0)
+        $allocs = [];
+        if ($remaining > 0) {
+            $plan = [
+                ['category' => 'groceries', 'ratio' => 0.30, 'reason' => 'Essential food and household items'],
+                ['category' => 'transport', 'ratio' => 0.15, 'reason' => 'Commuting and necessary travel'],
+                ['category' => 'bills', 'ratio' => 0.25, 'reason' => 'Utilities and mandatory payments'],
+                ['category' => 'savings', 'ratio' => 0.20, 'reason' => 'Buffer for emergencies or goals'],
+                ['category' => 'discretionary', 'ratio' => 0.10, 'reason' => 'Dining out, entertainment, small treats']
+            ];
+            foreach ($plan as $p) {
+                $allocs[] = [
+                    'category' => $p['category'],
+                    'amount' => round($remaining * $p['ratio'], 2),
+                    'reason' => $p['reason']
+                ];
+            }
+            // Ensure sum <= remaining by trimming last bucket if rounding exceeded
+            $sum = array_sum(array_column($allocs, 'amount'));
+            if ($sum > $remaining) {
+                $diff = $sum - $remaining;
+                $allocs[count($allocs) - 1]['amount'] = max(0, $allocs[count($allocs) - 1]['amount'] - $diff);
+            }
+        }
+
+        $overBudget = $budget > 0 && $spent > $budget;
+        $nearLimit = $budget > 0 && !$overBudget && ($spent / $budget) >= 0.85;
+
+        $recommendations = [];
+        if ($overBudget) {
+            $recommendations[] = [
+                'title' => 'Cut discretionary spending',
+                'detail' => 'Pause dining out and non-essential purchases until next month.'
+            ];
+            $recommendations[] = [
+                'title' => 'Shift to essentials only',
+                'detail' => 'Prioritize bills, groceries, and transport; keep daily spending under ' . $currency . ' ' . number_format($perDay, 2)
+            ];
+        } elseif ($nearLimit) {
+            $recommendations[] = [
+                'title' => 'Tighten daily cap',
+                'detail' => 'Aim for no more than ' . $currency . ' ' . number_format($perDay, 2) . ' per day to stay within budget.'
+            ];
+            $recommendations[] = [
+                'title' => 'Defer non-urgent buys',
+                'detail' => 'Postpone clothing or entertainment purchases until next month.'
+            ];
+        } else {
+            $recommendations[] = [
+                'title' => 'Pre-allocate essentials',
+                'detail' => 'Set aside funds for groceries, transport, and bills first; then savings.'
+            ];
+            $recommendations[] = [
+                'title' => 'Automate a small saving',
+                'detail' => 'Move 10–20% of remaining to savings to avoid end-of-month dips.'
+            ];
+        }
+
+        $risks = $overBudget
+            ? ['Overspending trend could impact upcoming bills; avoid credit if possible.']
+            : ($nearLimit ? ['Near the budget limit—be cautious with discretionary categories.'] : ['Unexpected expenses (health, repairs) could arise—keep a buffer.']);
+
+        return [
+            'summary' => $summary,
+            'recommendations' => $recommendations,
+            'suggestedAllocations' => $allocs,
+            'risks' => $risks,
+            'fallback' => true
+        ];
     }
 
     /**
@@ -544,7 +818,8 @@ PROMPT;
     }
 
     /**
-     * Execute API call with retry logic and exponential backoff
+     * Execute API call with retry logic and exponential backoff.
+     * Enhanced for 429 errors but keeps total wait time under 30s to prevent PHP timeouts.
      */
     protected function executeWithRetry(callable $apiCall, int $attempt = 1)
     {
@@ -559,24 +834,33 @@ PROMPT;
         } catch (\Exception $e) {
             $statusCode = method_exists($e, 'getCode') ? $e->getCode() : 500;
             
-            // Check if we should retry
-            $shouldRetry = in_array($statusCode, [429, 500, 503, 504]) && $attempt < $this->maxRetries;
+            // For 429 (rate limit), use 3 retries with shorter delays to avoid PHP timeout
+            // For other errors, use 2 retries
+            $maxRetries = $statusCode === 429 ? 3 : 2;
+            $shouldRetry = in_array($statusCode, [429, 500, 503, 504]) && $attempt < $maxRetries;
             
             if ($shouldRetry) {
                 // Calculate exponential backoff with jitter
-                $baseDelay = $this->retryBaseDelay * pow(2, $attempt - 1);
+                // Keep delays short: 2s, 4s, 8s max to stay under 60s timeout
+                $baseDelay = $statusCode === 429 
+                    ? 2000 * pow(2, $attempt - 1)  // 2s, 4s, 8s for 429
+                    : 1000 * pow(2, $attempt - 1); // 1s, 2s for others
+                    
                 $jitter = rand(0, (int)($baseDelay * 0.3)); // 30% jitter
                 $delay = ($baseDelay + $jitter) / 1000; // Convert to seconds
                 
+                // Cap individual delay at 10s to prevent runaway waits
+                $delay = min($delay, 10);
+                
                 Log::warning('Retrying Gemini API call', [
                     'attempt' => $attempt,
-                    'max_retries' => $this->maxRetries,
+                    'max_retries' => $maxRetries,
                     'status_code' => $statusCode,
-                    'delay_seconds' => $delay,
-                    'error' => $e->getMessage()
+                    'delay_seconds' => round($delay, 2),
+                    'error_preview' => substr($e->getMessage(), 0, 150)
                 ]);
                 
-                sleep((int)$delay);
+                sleep((int)ceil($delay));
                 
                 return $this->executeWithRetry($apiCall, $attempt + 1);
             }
@@ -587,7 +871,7 @@ PROMPT;
             Log::error('Gemini API call failed after retries', [
                 'attempts' => $attempt,
                 'status_code' => $statusCode,
-                'error' => $e->getMessage()
+                'error_preview' => substr($e->getMessage(), 0, 300)
             ]);
             
             throw $e;
