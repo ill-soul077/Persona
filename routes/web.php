@@ -48,6 +48,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/chart-data', [TransactionController::class, 'chartData'])->name('chart.data');
     Route::get('/category-drilldown', [TransactionController::class, 'categoryDrilldown'])->name('category.drilldown');
 
+    // Budget Management
+    Route::get('/budget', [\App\Http\Controllers\BudgetController::class, 'show'])->name('budget.show');
+    Route::post('/budget', [\App\Http\Controllers\BudgetController::class, 'store'])->name('budget.store');
+    Route::delete('/budget/{id}', [\App\Http\Controllers\BudgetController::class, 'destroy'])->name('budget.destroy');
+    Route::get('/budget/insights', [\App\Http\Controllers\BudgetController::class, 'insights'])->name('budget.insights');
+
     // Reports (alias within finance namespace for dashboard link compatibility)
     Route::get('/reports', [ReportController::class, 'index'])->name('reports');
 });

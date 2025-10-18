@@ -53,6 +53,21 @@ class DashboardController extends Controller
         // Trends (last 7 days)
         $weeklyTrend = $this->getWeeklyTrend($userId);
         
+        // Current month's budget
+        $currentBudget = auth()->user()->currentBudget();
+        $budgetData = null;
+        
+        if ($currentBudget) {
+            $budgetData = [
+                'amount' => $currentBudget->amount,
+                'spent' => $currentBudget->total_spent,
+                'remaining' => $currentBudget->remaining,
+                'percentage' => round($currentBudget->percentage_used, 1),
+                'status' => $currentBudget->status_color,
+                'is_exceeded' => $currentBudget->isExceeded(),
+            ];
+        }
+        
         // Alias variables for view compatibility
         $totalIncome = $monthlyIncome;
         $totalExpenses = $monthlyExpenses;
@@ -70,7 +85,8 @@ class DashboardController extends Controller
             'recentTasks',
             'recentAiLogs',
             'expenseDistribution',
-            'weeklyTrend'
+            'weeklyTrend',
+            'budgetData'
         ));
     }
     

@@ -81,6 +81,11 @@
     </div>
 </div>
 
+<!-- Budget Progress Section -->
+<div class="animate-fade-in">
+    @include('components.budget-progress')
+</div>
+
 <!-- Charts Section -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
     <!-- Expense Breakdown Chart -->

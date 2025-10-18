@@ -88,4 +88,23 @@ class User extends Authenticatable
     {
         return $this->hasMany(AiLog::class);
     }
+
+    /**
+     * Get all budgets for the user.
+     */
+    public function budgets(): HasMany
+    {
+        return $this->hasMany(Budget::class);
+    }
+
+    /**
+     * Get current month's budget.
+     */
+    public function currentBudget()
+    {
+        return $this->budgets()
+            ->whereYear('month', now()->year)
+            ->whereMonth('month', now()->month)
+            ->first();
+    }
 }

@@ -17,7 +17,9 @@
 
 - 🤖 **AI-Powered Chatbot** - Natural language transaction logging with Google Gemini
 - 📊 **Interactive Dashboard** - Real-time financial overview with beautiful charts
-- 💳 **Dual Input Modes** - Chat with AI or use manual entry forms
+- � **Monthly Budget Tracking** - Set budgets, track spending, get smart insights
+- 📈 **Budget vs Actual Analysis** - Visual progress bars and spending recommendations
+- �💳 **Dual Input Modes** - Chat with AI or use manual entry forms
 - 📈 **Smart Analytics** - Expense breakdown, savings rate, and trend analysis
 - 🔒 **Secure & Private** - User-specific data with policy-based authorization
 - 🌍 **Multi-Currency Support** - Track expenses in BDT and USD
@@ -99,26 +101,118 @@ Password: password
 
 ---
 
-## 💡 Usage
+## 💡 Features Deep Dive
 
-### Using the AI Chatbot
+### 🎯 Monthly Budget Management
 
-Simply click the chatbot button and type naturally:
+Set and track monthly spending budgets with real-time insights:
 
-```
-"I spent 500 taka on groceries at Agora"
-"Received salary of 50000 BDT today"
-"Paid 1200 for electricity bill"
-"Got paid $1500 for freelance work"
-```
+**Budget Setup:**
+- Set monthly budget amounts in your preferred currency
+- Apply budget settings to future months (up to 12 months ahead)
+- Add notes and context to your budgets
+- Edit or delete budgets anytime
 
-The AI will:
-- ✅ Extract amount, currency, category, and vendor
-- ✅ Detect transaction type (income/expense)
-- ✅ Parse dates (yesterday, last week, etc.)
-- ✅ Show confidence score
-- ✅ Ask for confirmation before saving
+**Budget Tracking:**
+- **Visual Progress Bar** - Color-coded indicators (green/yellow/red)
+  - 🟢 Green: Under 80% spent (On Track)
+  - 🟡 Yellow: 80-100% spent (Near Limit)
+  - 🔴 Red: Over 100% spent (Over Budget)
+- **Real-time Statistics:**
+  - Total budget amount
+  - Amount spent this month
+  - Remaining budget
+  - Percentage used
+  - Days remaining in month
 
+**Smart Insights & Recommendations:**
+Access `/finance/budget/insights` for detailed analytics:
+- Daily budget calculation
+- Spending variance (expected vs actual)
+- Spending pace analysis
+- Personalized recommendations based on your habits:
+  - Spending on track
+  - Approaching budget limit
+  - Budget exceeded with corrective actions
+  - Under budget with optimization tips
+
+**Technical Implementation:**
+- Database: `budgets` table with unique constraint per user/month
+- Model: `Budget.php` with computed attributes and business logic
+- Controller: `BudgetController.php` with CRUD + insights API
+- UI: Reusable `budget-progress.blade.php` component with Alpine.js
+- Routes: RESTful endpoints under `/finance/budget`
+
+### 🤖 AI-Powered Features
+
+**Natural Language Processing:**
+
+The AI chatbot understands your natural language input to log transactions:
+
+- "I spent 500 BDT on groceries"
+- "Received salary of 50000"
+- "Paid 300 for dinner last night"
+
+### 📊 Dashboard Analytics
+
+**Financial Overview:**
+- Total Income, Expenses, and Balance
+- Monthly Budget Progress
+- Savings Rate calculation
+- Recent transactions list
+
+**Visual Charts:**
+- Expense breakdown by category
+- Income vs Expense comparison
+- Monthly trends and patterns
+
+---
+
+## 📖 How to Use
+
+### Managing Your Monthly Budget
+
+**Create a Budget:**
+1. Navigate to Dashboard
+2. Click "Set Budget" button (if no budget exists)
+3. Enter budget amount (e.g., 50000)
+4. Select currency (BDT/USD)
+5. Add optional notes
+6. Toggle "Apply to next 12 months" if desired
+7. Click "Save Budget"
+
+**Monitor Budget Progress:**
+- View real-time progress bar with color indicators
+- Check percentage used and remaining amount
+- Monitor status: "On Track", "Near Limit", or "Over Budget"
+
+**Edit Your Budget:**
+1. Click "Edit Budget" button
+2. Update amount, currency, or notes
+3. Choose to apply changes to future months
+4. Save changes
+
+**Get Budget Insights:**
+- Navigate to Finance Dashboard
+- Click "View Insights" for detailed analytics
+- See daily budget, spending variance, and pace
+- Read personalized spending recommendations
+
+### Logging Transactions with AI
+
+**Using the Chat Interface:**
+1. Navigate to Finance → Transactions
+2. Click "Chat with Assistant"
+3. Type natural language requests:
+   - "I spent 500 BDT on groceries"
+   - "Received salary of 50000"
+   - "Paid 300 for dinner last night"
+4. AI automatically extracts amount, category, and type
+
+**Manual Entry:**
+- Use the "Add Transaction" form for precise control
+- Select type (income/expense), category, and amount
+- Add optional notes and date
 
 ---
 

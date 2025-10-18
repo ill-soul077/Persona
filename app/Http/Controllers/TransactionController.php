@@ -36,6 +36,7 @@ class TransactionController extends Controller
      */
     public function dashboard(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
     // Only apply date range if provided; otherwise include all records
     // Accept dates from query or headers (tests may pass as headers)
@@ -79,6 +80,22 @@ class TransactionController extends Controller
             ->map(fn($group) => $group->sum('amount'))
             ->sortDesc();
 
+        // Current month's budget
+        $currentBudget = $user->currentBudget();
+        $budgetData = null;
+        
+        if ($currentBudget) {
+            $budgetData = [
+                'amount' => $currentBudget->amount,
+                'spent' => $currentBudget->total_spent,
+                'remaining' => $currentBudget->remaining,
+                'percentage' => round($currentBudget->percentage_used, 1),
+                'status' => $currentBudget->status_color,
+                'is_exceeded' => $currentBudget->isExceeded(),
+                'month_name' => $currentBudget->month_name,
+            ];
+        }
+
         return view('finance.dashboard', compact(
             'totalIncome',
             'totalExpense',
@@ -86,7 +103,8 @@ class TransactionController extends Controller
             'recentTransactions',
             'expenseBreakdown',
             'startDate',
-            'endDate'
+            'endDate',
+            'budgetData'
         ));
     }
 
@@ -289,13 +307,23 @@ class TransactionController extends Controller
             'date' => 'required|date|before_or_equal:today',
             'category_id' => 'required|integer',
             'description' => 'nullable|string|max:1000',
+            'meta.vendor' => 'nullable|string|max:255',
+            'meta.location' => 'nullable|string|max:255',
+            'meta.tax' => 'nullable|numeric|min:0',
+            'meta.tip' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            return redirect()->back()
+                           ->withErrors($validator)
+                           ->withInput();
         }
 
         DB::beginTransaction();
@@ -303,6 +331,14 @@ class TransactionController extends Controller
             $categoryType = $request->type === 'income' 
                 ? IncomeSource::class 
                 : ExpenseCategory::class;
+
+            // Build meta data
+            $meta = array_filter([
+                'vendor' => $request->input('meta.vendor'),
+                'location' => $request->input('meta.location'),
+                'tax' => $request->input('meta.tax'),
+                'tip' => $request->input('meta.tip'),
+            ]);
 
             $transaction->update([
                 'type' => $request->type,
@@ -312,23 +348,35 @@ class TransactionController extends Controller
                 'category_id' => $request->category_id,
                 'category_type' => $categoryType,
                 'description' => strip_tags($request->description),
+                'meta' => empty($meta) ? $transaction->meta : array_merge($transaction->meta ?? [], $meta),
             ]);
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaction updated successfully!',
-                'transaction' => $transaction->fresh()->load('category')
-            ]);
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transaction updated successfully!',
+                    'transaction' => $transaction->fresh()->load('category')
+                ]);
+            }
+
+            return redirect()->route('finance.transactions.show', $transaction)
+                           ->with('success', 'Transaction updated successfully!');
 
         } catch (\Exception $e) {
             DB::rollBack();
             
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update transaction: ' . $e->getMessage()
-            ], 500);
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to update transaction: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                           ->withErrors(['error' => 'Failed to update transaction: ' . $e->getMessage()])
+                           ->withInput();
         }
     }
 
@@ -342,15 +390,26 @@ class TransactionController extends Controller
         try {
             $transaction->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaction deleted successfully!'
-            ]);
+            if (request()->expectsJson() || request()->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transaction deleted successfully!'
+                ]);
+            }
+
+            return redirect()->route('finance.transactions.index')
+                           ->with('success', 'Transaction deleted successfully!');
+
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete transaction: ' . $e->getMessage()
-            ], 500);
+            if (request()->expectsJson() || request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to delete transaction: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                           ->withErrors(['error' => 'Failed to delete transaction: ' . $e->getMessage()]);
         }
     }
 

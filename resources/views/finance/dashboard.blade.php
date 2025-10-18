@@ -35,6 +35,9 @@
     </div>
 </div>
 
+<!-- Monthly Budget Progress Widget -->
+@include('components.budget-progress')
+
 <!-- Finance Stats -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
     <div class="glass-card rounded-xl p-6 animate-bounce-in">
