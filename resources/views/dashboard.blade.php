@@ -4,28 +4,15 @@
 @section('page-icon', '🏠')
 @section('page-title', 'Dashboard')
 
-@section('additional-scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-@endsection
-
 @section('content')
-<!-- Finance Dashboard Header -->
+<!-- Dashboard Header -->
 <div class="glass-card rounded-xl p-6 animate-fade-in">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
-            <h1 class="text-3xl font-bold text-white">Finance Dashboard</h1>
-            <p class="text-gray-300 mt-2">Analyze income and expenses at a glance</p>
+            <h1 class="text-3xl font-bold text-white">Dashboard</h1>
+            <p class="text-gray-300 mt-2">Your financial overview at a glance</p>
         </div>
         <div class="mt-4 md:mt-0 flex space-x-3">
-            <form method="POST" action="{{ route('dashboard.budget.refresh') }}">
-                @csrf
-                <button type="submit" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    <span>Refresh</span>
-                </button>
-            </form>
             <button class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -89,25 +76,6 @@
     @include('components.budget-progress')
     @include('components.budget-ai-summary')
     
-</div>
-
-<!-- Charts Section -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-    <!-- Expense Breakdown Chart -->
-    <div class="glass-card rounded-xl p-6">
-        <h3 class="text-xl font-bold text-white mb-4">Expense Breakdown</h3>
-        <div class="h-64 flex items-center justify-center">
-            <canvas id="expenseChart" width="400" height="200"></canvas>
-        </div>
-    </div>
-
-    <!-- Monthly Trend Chart -->
-    <div class="glass-card rounded-xl p-6">
-        <h3 class="text-xl font-bold text-white mb-4">Monthly Trend</h3>
-        <div class="h-64 flex items-center justify-center">
-            <canvas id="trendChart" width="400" height="200"></canvas>
-        </div>
-    </div>
 </div>
 
 <!-- Recent Transactions -->
@@ -181,101 +149,4 @@
         </a>
     </div>
 </div>
-@endsection
-
-@section('scripts')
-<script>
-// Chart.js configuration for Expense Breakdown
-@if(isset($expenseBreakdown))
-const expenseData = @json($expenseBreakdown);
-const expenseLabels = Object.keys(expenseData);
-const expenseValues = Object.values(expenseData);
-
-if (expenseLabels.length > 0) {
-    const ctx1 = document.getElementById('expenseChart').getContext('2d');
-    new Chart(ctx1, {
-        type: 'doughnut',
-        data: {
-            labels: expenseLabels,
-            datasets: [{
-                data: expenseValues,
-                backgroundColor: [
-                    'rgba(239, 68, 68, 0.8)',
-                    'rgba(245, 158, 11, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(59, 130, 246, 0.8)',
-                    'rgba(147, 51, 234, 0.8)',
-                    'rgba(236, 72, 153, 0.8)'
-                ],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#f8fafc',
-                        padding: 20
-                    }
-                }
-            }
-        }
-    });
-}
-@endif
-
-// Monthly Trend Chart
-const ctx2 = document.getElementById('trendChart').getContext('2d');
-new Chart(ctx2, {
-    type: 'line',
-    data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-            label: 'Income',
-            data: [3000, 3200, 2800, 3500, 3800, 4000],
-            borderColor: 'rgba(34, 197, 94, 1)',
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            tension: 0.4
-        }, {
-            label: 'Expenses',
-            data: [2200, 2500, 2300, 2800, 2600, 2900],
-            borderColor: 'rgba(239, 68, 68, 1)',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            tension: 0.4
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                labels: {
-                    color: '#f8fafc'
-                }
-            }
-        },
-        scales: {
-            y: {
-                ticks: {
-                    color: '#f8fafc'
-                },
-                grid: {
-                    color: 'rgba(255, 255, 255, 0.1)'
-                }
-            },
-            x: {
-                ticks: {
-                    color: '#f8fafc'
-                },
-                grid: {
-                    color: 'rgba(255, 255, 255, 0.1)'
-                }
-            }
-        }
-    }
-});
-</script>
 @endsection

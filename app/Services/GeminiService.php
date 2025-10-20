@@ -342,9 +342,9 @@ PROMPT;
         $url = "{$this->baseUrl}/models/{$this->model}:generateContent?key={$this->apiKey}";
 
         // Wrap with retry/backoff to handle transient 429/5xx
-        // Set HTTP timeout to 25s to prevent individual requests from hanging
+        // Set HTTP timeout to 60s for Gemini 2.5 Flash (thinking mode takes longer)
         $response = $this->executeWithRetry(function () use ($url, $prompt) {
-            $resp = Http::timeout(25)
+            $resp = Http::timeout(60)
                 ->withHeaders(['Content-Type' => 'application/json'])
                 ->post($url, [
                     'contents' => [
@@ -466,9 +466,15 @@ PROMPT;
             Log::info('Budget advice generated successfully', ['model' => $this->model]);
             return $data;
         } catch (\Exception $e) {
-            // If quota exhausted or rate limited, provide a graceful heuristic fallback
-            if (str_contains(strtolower($e->getMessage()), 'quota') || $e->getCode() === 429) {
-                Log::warning('Using local fallback for budget advice due to quota/rate limit', [
+            $errorMsg = strtolower($e->getMessage());
+            
+            // If quota exhausted, rate limited, or timed out, provide a graceful heuristic fallback
+            if (str_contains($errorMsg, 'quota') || 
+                str_contains($errorMsg, 'timeout') || 
+                str_contains($errorMsg, 'timed out') ||
+                str_contains($errorMsg, 'curl error 28') ||
+                $e->getCode() === 429) {
+                Log::warning('Using local fallback for budget advice due to API issue', [
                     'error' => substr($e->getMessage(), 0, 200),
                     'attempted_model' => $this->model
                 ]);
