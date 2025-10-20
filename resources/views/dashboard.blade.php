@@ -78,6 +78,177 @@
     
 </div>
 
+<!-- Today's & Tomorrow's Tasks -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
+    <!-- Today's Tasks -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white">Today's Tasks</h3>
+                    <p class="text-gray-400 text-sm">{{ now()->format('l, F j') }}</p>
+                </div>
+            </div>
+            <a href="{{ route('tasks.index') }}" class="text-blue-400 hover:text-blue-300 transition-colors text-sm font-medium">
+                View All →
+            </a>
+        </div>
+        
+        @php
+            $todaysTasks = \App\Models\Task::where('user_id', Auth::id())
+                ->whereDate('due_date', now()->toDateString())
+                ->orderBy('priority', 'desc')
+                ->orderBy('due_date', 'asc')
+                ->get();
+        @endphp
+        
+        @if($todaysTasks->count() > 0)
+        <div class="space-y-3">
+            @foreach($todaysTasks->take(5) as $task)
+            <div class="flex items-start space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group">
+                <div class="flex-shrink-0 mt-1">
+                    <input type="checkbox" 
+                           {{ $task->status === 'completed' ? 'checked' : '' }}
+                           class="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
+                           onclick="window.location.href='{{ route('tasks.show', $task->id) }}'">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <a href="{{ route('tasks.show', $task->id) }}" class="block group-hover:text-blue-400 transition-colors">
+                        <h4 class="text-white font-medium {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
+                            {{ $task->title }}
+                        </h4>
+                        @if($task->description)
+                        <p class="text-gray-400 text-sm mt-1 line-clamp-1">{{ $task->description }}</p>
+                        @endif
+                    </a>
+                </div>
+                <div class="flex-shrink-0">
+                    @if($task->priority === 'high')
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                        High
+                    </span>
+                    @elseif($task->priority === 'medium')
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                        Medium
+                    </span>
+                    @else
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
+                        Low
+                    </span>
+                    @endif
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @else
+        <div class="text-center py-12">
+            <div class="text-gray-400 mb-4">
+                <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-white mb-2">No Tasks Today</h3>
+            <p class="text-gray-400 mb-4">You're all caught up for today!</p>
+            <a href="{{ route('tasks.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add Task
+            </a>
+        </div>
+        @endif
+    </div>
+
+    <!-- Tomorrow's Tasks -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white">Tomorrow's Tasks</h3>
+                    <p class="text-gray-400 text-sm">{{ now()->addDay()->format('l, F j') }}</p>
+                </div>
+            </div>
+            <a href="{{ route('tasks.index') }}" class="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium">
+                View All →
+            </a>
+        </div>
+        
+        @php
+            $tomorrowsTasks = \App\Models\Task::where('user_id', Auth::id())
+                ->whereDate('due_date', now()->addDay()->toDateString())
+                ->orderBy('priority', 'desc')
+                ->orderBy('due_date', 'asc')
+                ->get();
+        @endphp
+        
+        @if($tomorrowsTasks->count() > 0)
+        <div class="space-y-3">
+            @foreach($tomorrowsTasks->take(5) as $task)
+            <div class="flex items-start space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group">
+                <div class="flex-shrink-0 mt-1">
+                    <input type="checkbox" 
+                           {{ $task->status === 'completed' ? 'checked' : '' }}
+                           class="w-5 h-5 rounded border-gray-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-900"
+                           onclick="window.location.href='{{ route('tasks.show', $task->id) }}'">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <a href="{{ route('tasks.show', $task->id) }}" class="block group-hover:text-purple-400 transition-colors">
+                        <h4 class="text-white font-medium {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
+                            {{ $task->title }}
+                        </h4>
+                        @if($task->description)
+                        <p class="text-gray-400 text-sm mt-1 line-clamp-1">{{ $task->description }}</p>
+                        @endif
+                    </a>
+                </div>
+                <div class="flex-shrink-0">
+                    @if($task->priority === 'high')
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                        High
+                    </span>
+                    @elseif($task->priority === 'medium')
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                        Medium
+                    </span>
+                    @else
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
+                        Low
+                    </span>
+                    @endif
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @else
+        <div class="text-center py-12">
+            <div class="text-gray-400 mb-4">
+                <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-white mb-2">No Tasks Tomorrow</h3>
+            <p class="text-gray-400 mb-4">Plan ahead for tomorrow</p>
+            <a href="{{ route('tasks.create') }}" class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add Task
+            </a>
+        </div>
+        @endif
+    </div>
+</div>
+
 <!-- Recent Transactions -->
 <div class="glass-card rounded-xl p-6 animate-fade-in">
     <div class="flex justify-between items-center mb-6">
