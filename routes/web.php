@@ -8,11 +8,15 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
-// Welcome/Landing Page (keep public landing available for tests)
+// Landing Page - Redirect to dashboard if authenticated
 Route::get('/', function () {
-    return view('welcome');
-});
+    if (Auth::check()) {
+        return redirect()->route('dashboard');
+    }
+    return view('landing');
+})->name('landing');
 
 // Unified Dashboard (Main Dashboard)
 Route::middleware(['auth'])->group(function () {
