@@ -110,16 +110,16 @@
         @if($todaysTasks->count() > 0)
         <div class="space-y-3">
             @foreach($todaysTasks->take(5) as $task)
-            <div class="flex items-start space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group">
+            <div class="flex items-start space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group" data-task-id="{{ $task->id }}">
                 <div class="flex-shrink-0 mt-1">
                     <input type="checkbox" 
                            {{ $task->status === 'completed' ? 'checked' : '' }}
-                           class="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
-                           onclick="window.location.href='{{ route('tasks.show', $task->id) }}'">
+                           class="task-checkbox w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
+                           data-task-id="{{ $task->id }}">
                 </div>
                 <div class="flex-1 min-w-0">
                     <a href="{{ route('tasks.show', $task->id) }}" class="block group-hover:text-blue-400 transition-colors">
-                        <h4 class="text-white font-medium {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
+                        <h4 class="task-title text-white font-medium {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
                             {{ $task->title }}
                         </h4>
                         @if($task->description)
@@ -194,16 +194,16 @@
         @if($tomorrowsTasks->count() > 0)
         <div class="space-y-3">
             @foreach($tomorrowsTasks->take(5) as $task)
-            <div class="flex items-start space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group">
+            <div class="flex items-start space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group" data-task-id="{{ $task->id }}">
                 <div class="flex-shrink-0 mt-1">
                     <input type="checkbox" 
                            {{ $task->status === 'completed' ? 'checked' : '' }}
-                           class="w-5 h-5 rounded border-gray-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-900"
-                           onclick="window.location.href='{{ route('tasks.show', $task->id) }}'">
+                           class="task-checkbox w-5 h-5 rounded border-gray-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-900 cursor-pointer"
+                           data-task-id="{{ $task->id }}">
                 </div>
                 <div class="flex-1 min-w-0">
                     <a href="{{ route('tasks.show', $task->id) }}" class="block group-hover:text-purple-400 transition-colors">
-                        <h4 class="text-white font-medium {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
+                        <h4 class="task-title text-white font-medium {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
                             {{ $task->title }}
                         </h4>
                         @if($task->description)
@@ -320,4 +320,76 @@
         </a>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle task checkbox toggle
+    document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const taskId = this.getAttribute('data-task-id');
+            const isChecked = this.checked;
+            const taskContainer = this.closest('[data-task-id]');
+            const taskTitle = taskContainer.querySelector('.task-title');
+            
+            // Toggle checkbox immediately for better UX
+            this.checked = !isChecked;
+            
+            // Make AJAX request to toggle status
+            fetch(`/tasks/${taskId}/toggle-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update task title appearance
+                    if (data.status === 'completed') {
+                        taskTitle.classList.add('line-through', 'text-gray-500');
+                    } else {
+                        taskTitle.classList.remove('line-through', 'text-gray-500');
+                    }
+                    
+                    // Show success notification
+                    showNotification(data.message, 'success');
+                } else {
+                    // Revert checkbox on error
+                    this.checked = isChecked;
+                    showNotification(data.message || 'Failed to update task', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Revert checkbox on error
+                this.checked = isChecked;
+                showNotification('An error occurred while updating the task', 'error');
+            });
+        });
+    });
+    
+    // Simple notification function
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity ${
+            type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        } text-white`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+});
+</script>
+
 @endsection
