@@ -186,6 +186,138 @@
         </div>
     </div>
 </div>
+
+<!-- Productivity Analytics Section -->
+<div class="glass-card rounded-xl p-6 mt-8 animate-fade-in">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-white flex items-center">
+            <svg class="w-8 h-8 mr-3 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+            Productivity Analytics
+        </h2>
+        <div class="text-gray-400 text-sm">
+            Last {{ $taskPeriod }} days
+        </div>
+    </div>
+</div>
+
+<!-- Task Metrics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-up">
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-300 text-sm">Tasks Completed Today</span>
+            <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-3xl font-bold text-green-400">{{ $taskMetrics['completed_today'] }}</h3>
+        <p class="text-gray-400 text-xs mt-2">{{ now()->format('l') }}</p>
+    </div>
+
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-300 text-sm">Weekly Completion Rate</span>
+            <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+        </div>
+        <h3 class="text-3xl font-bold text-blue-400">{{ $taskMetrics['weekly_rate'] }}%</h3>
+        <p class="text-gray-400 text-xs mt-2">This week's performance</p>
+    </div>
+
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-300 text-sm">Current Streak</span>
+            <span class="text-2xl">🔥</span>
+        </div>
+        <h3 class="text-3xl font-bold text-orange-400">{{ $taskMetrics['current_streak'] }}</h3>
+        <p class="text-gray-400 text-xs mt-2">{{ $taskMetrics['current_streak'] === 1 ? 'day' : 'days' }} in a row</p>
+    </div>
+
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-300 text-sm">Avg Tasks / Day</span>
+            <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+        </div>
+        <h3 class="text-3xl font-bold text-purple-400">{{ $taskMetrics['avg_per_day'] }}</h3>
+        <p class="text-gray-400 text-xs mt-2">Last 30 days average</p>
+    </div>
+</div>
+
+<!-- Task Analytics Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
+    <!-- Completion Trend -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+            </svg>
+            Completion Trend
+        </h3>
+        <div class="h-64">
+            <canvas id="completionTrendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Priority Distribution -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Priority Distribution
+        </h3>
+        <div class="h-64">
+            <canvas id="priorityChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Productivity Heatmap -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Productivity by Hour
+        </h3>
+        <div class="h-64">
+            <canvas id="heatmapChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Category Breakdown -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            </svg>
+            Task Categories
+        </h3>
+        <div class="h-64">
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Smart Insights -->
+@if(count($smartInsights) > 0)
+<div class="grid grid-cols-1 md:grid-cols-{{ min(count($smartInsights), 3) }} gap-6 animate-fade-in">
+    @foreach($smartInsights as $insight)
+    <div class="glass-card rounded-xl p-6 border-l-4 border-purple-500">
+        <div class="flex items-start space-x-3">
+            <span class="text-3xl">{{ $insight['icon'] }}</span>
+            <div>
+                <h4 class="text-lg font-bold text-white mb-2">{{ $insight['title'] }}</h4>
+                <p class="text-gray-300 text-sm">{{ $insight['message'] }}</p>
+            </div>
+        </div>
+    </div>
+    @endforeach
+</div>
+@endif
 @endsection
 
 @section('scripts')
@@ -338,5 +470,249 @@
     expenseCtx.textAlign = 'center';
     expenseCtx.fillText('No expense data for this month', expenseCtx.canvas.width / 2, expenseCtx.canvas.height / 2);
     @endif
+
+    // ============================================
+    // PRODUCTIVITY ANALYTICS CHARTS
+    // ============================================
+
+    // Completion Trend Chart
+    const completionTrendCtx = document.getElementById('completionTrendChart').getContext('2d');
+    new Chart(completionTrendCtx, {
+        type: 'line',
+        data: {
+            labels: @json($completionTrend['labels']),
+            datasets: [{
+                label: 'Tasks Completed',
+                data: @json($completionTrend['data']),
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: 'rgb(34, 197, 94)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#9CA3AF',
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#9CA3AF',
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        }
+    });
+
+    // Priority Distribution Chart
+    const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+    new Chart(priorityCtx, {
+        type: 'pie',
+        data: {
+            labels: @json($priorityDistribution['labels']),
+            datasets: [{
+                data: @json($priorityDistribution['data']),
+                backgroundColor: @json($priorityDistribution['colors']),
+                borderColor: 'rgba(0, 0, 0, 0.8)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        color: '#fff',
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return label + ': ' + value + ' tasks (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Productivity Heatmap Chart
+    const heatmapCtx = document.getElementById('heatmapChart').getContext('2d');
+    new Chart(heatmapCtx, {
+        type: 'bar',
+        data: {
+            labels: @json($productivityHeatmap['labels']),
+            datasets: [{
+                label: 'Tasks Completed',
+                data: @json($productivityHeatmap['data']),
+                backgroundColor: function(context) {
+                    const value = context.parsed.y;
+                    if (value === 0) return 'rgba(107, 114, 128, 0.3)';
+                    if (value <= 2) return 'rgba(59, 130, 246, 0.6)';
+                    if (value <= 5) return 'rgba(139, 92, 246, 0.7)';
+                    return 'rgba(168, 85, 247, 0.9)';
+                },
+                borderColor: 'rgba(139, 92, 246, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    callbacks: {
+                        title: function(context) {
+                            return 'Hour: ' + context[0].label;
+                        },
+                        label: function(context) {
+                            return 'Tasks: ' + context.parsed.y;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    },
+                    ticks: {
+                        color: '#9CA3AF',
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#9CA3AF',
+                        maxRotation: 90,
+                        minRotation: 45,
+                        font: {
+                            size: 9
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Task Category Breakdown Chart
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: @json($taskCategoryBreakdown['labels']),
+            datasets: [{
+                data: @json($taskCategoryBreakdown['data']),
+                backgroundColor: [
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(236, 72, 153, 0.8)',
+                    'rgba(34, 197, 94, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(239, 68, 68, 0.8)',
+                    'rgba(20, 184, 166, 0.8)',
+                    'rgba(148, 163, 184, 0.8)'
+                ],
+                borderColor: 'rgba(0, 0, 0, 0.8)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'right',
+                    labels: {
+                        color: '#fff',
+                        padding: 10,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return label + ': ' + value + ' tasks (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
 </script>
 @endsection
