@@ -7,6 +7,10 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\FocusSessionController;
+use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\TaskTemplateController;
+use App\Http\Controllers\BudgetController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,10 +29,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/dashboard/budget/refresh', [DashboardController::class, 'refreshBudgetSummary'])->name('dashboard.budget.refresh');
     
     // Chatbot Routes
-    Route::get('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'index'])->name('chatbot');
-    Route::post('/chatbot/process', [\App\Http\Controllers\ChatbotController::class, 'processMessage'])->name('chatbot.process');
-    Route::post('/chatbot/confirm', [\App\Http\Controllers\ChatbotController::class, 'confirmTransaction'])->name('chatbot.confirm');
-    Route::post('/chatbot/confirm-task', [\App\Http\Controllers\ChatbotController::class, 'confirmTask'])->name('chatbot.confirm-task');
+    Route::get('/chatbot', [ChatbotController::class, 'index'])->name('chatbot');
+    Route::post('/chatbot/process', [ChatbotController::class, 'processMessage'])->name('chatbot.process');
+    Route::post('/chatbot/confirm', [ChatbotController::class, 'confirmTransaction'])->name('chatbot.confirm');
+    Route::post('/chatbot/confirm-task', [ChatbotController::class, 'confirmTask'])->name('chatbot.confirm-task');
     
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -55,10 +59,10 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/category-drilldown', [TransactionController::class, 'categoryDrilldown'])->name('category.drilldown');
 
     // Budget Management
-    Route::get('/budget', [\App\Http\Controllers\BudgetController::class, 'show'])->name('budget.show');
-    Route::post('/budget', [\App\Http\Controllers\BudgetController::class, 'store'])->name('budget.store');
-    Route::delete('/budget/{id}', [\App\Http\Controllers\BudgetController::class, 'destroy'])->name('budget.destroy');
-    Route::get('/budget/insights', [\App\Http\Controllers\BudgetController::class, 'insights'])->name('budget.insights');
+    Route::get('/budget', [BudgetController::class, 'show'])->name('budget.show');
+    Route::post('/budget', [BudgetController::class, 'store'])->name('budget.store');
+    Route::delete('/budget/{id}', [BudgetController::class, 'destroy'])->name('budget.destroy');
+    Route::get('/budget/insights', [BudgetController::class, 'insights'])->name('budget.insights');
 
     // Reports (alias within finance namespace for dashboard link compatibility)
     Route::get('/reports', [ReportController::class, 'index'])->name('reports');
@@ -87,11 +91,11 @@ Route::middleware(['auth'])->prefix('tasks')->name('tasks.')->group(function () 
 
 // Focus Mode Routes
 Route::middleware(['auth'])->prefix('focus')->name('focus.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\FocusSessionController::class, 'index'])->name('index');
-    Route::get('/analytics', [\App\Http\Controllers\FocusSessionController::class, 'analytics'])->name('analytics');
-    Route::post('/sessions/start', [\App\Http\Controllers\FocusSessionController::class, 'start'])->name('sessions.start');
-    Route::post('/sessions/{session}/complete', [\App\Http\Controllers\FocusSessionController::class, 'complete'])->name('sessions.complete');
-    Route::get('/sessions/history', [\App\Http\Controllers\FocusSessionController::class, 'history'])->name('sessions.history');
+    Route::get('/', [FocusSessionController::class, 'index'])->name('index');
+    Route::get('/analytics', [FocusSessionController::class, 'analytics'])->name('analytics');
+    Route::post('/sessions/start', [FocusSessionController::class, 'start'])->name('sessions.start');
+    Route::post('/sessions/{session}/complete', [FocusSessionController::class, 'complete'])->name('sessions.complete');
+    Route::get('/sessions/history', [FocusSessionController::class, 'history'])->name('sessions.history');
 });
 
 // Chat/AI API Routes (for AJAX)
@@ -117,15 +121,15 @@ Route::middleware(['auth'])->group(function () {
 
 // Task Templates
 Route::middleware(['auth'])->prefix('templates')->name('templates.')->group(function () {
-    Route::get('/', [App\Http\Controllers\TaskTemplateController::class, 'index'])->name('index');
-    Route::get('/create', [App\Http\Controllers\TaskTemplateController::class, 'create'])->name('create');
-    Route::post('/', [App\Http\Controllers\TaskTemplateController::class, 'store'])->name('store');
-    Route::get('/{template}', [App\Http\Controllers\TaskTemplateController::class, 'show'])->name('show');
-    Route::get('/{template}/edit', [App\Http\Controllers\TaskTemplateController::class, 'edit'])->name('edit');
-    Route::put('/{template}', [App\Http\Controllers\TaskTemplateController::class, 'update'])->name('update');
-    Route::delete('/{template}', [App\Http\Controllers\TaskTemplateController::class, 'destroy'])->name('destroy');
-    Route::post('/{template}/apply', [App\Http\Controllers\TaskTemplateController::class, 'apply'])->name('apply');
-    Route::get('/api/suggestions', [App\Http\Controllers\TaskTemplateController::class, 'suggestions'])->name('suggestions');
+    Route::get('/', [TaskTemplateController::class, 'index'])->name('index');
+    Route::get('/create', [TaskTemplateController::class, 'create'])->name('create');
+    Route::post('/', [TaskTemplateController::class, 'store'])->name('store');
+    Route::get('/{template}', [TaskTemplateController::class, 'show'])->name('show');
+    Route::get('/{template}/edit', [TaskTemplateController::class, 'edit'])->name('edit');
+    Route::put('/{template}', [TaskTemplateController::class, 'update'])->name('update');
+    Route::delete('/{template}', [TaskTemplateController::class, 'destroy'])->name('destroy');
+    Route::post('/{template}/apply', [TaskTemplateController::class, 'apply'])->name('apply');
+    Route::get('/api/suggestions', [TaskTemplateController::class, 'suggestions'])->name('suggestions');
 });
 
 // Authentication Routes
