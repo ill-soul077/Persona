@@ -142,35 +142,42 @@
                         </svg>
                     </div>
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">Confirm Transaction</h3>
-                        <div class="mt-4 space-y-3" x-show="parsedData">
-                            <div class="bg-gray-50 rounded-md p-3">
-                                <div class="grid grid-cols-2 gap-2 text-sm">
-                                    <div class="text-gray-500">Type:</div>
-                                    <div class="font-medium capitalize" :class="parsedData?.type === 'income' ? 'text-green-600' : 'text-red-600'" x-text="parsedData?.type"></div>
-                                    
-                                    <div class="text-gray-500">Amount:</div>
-                                    <div class="font-medium" x-text="`${parsedData?.currency} ${parsedData?.amount}`"></div>
-                                    
-                                    <div class="text-gray-500">Category:</div>
-                                    <div class="font-medium" x-text="parsedData?.category"></div>
-                                    
-                                    <div class="text-gray-500">Date:</div>
-                                    <div class="font-medium" x-text="parsedData?.date"></div>
-                                    
-                                    <template x-if="parsedData?.description">
-                                        <div class="text-gray-500">Description:</div>
-                                        <div class="font-medium" x-text="parsedData?.description"></div>
-                                    </template>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Confirm Transaction<span x-show="parsedTransactions.length>1">s</span></h3>
+                        <div class="mt-4 space-y-3" x-show="parsedTransactions && parsedTransactions.length">
+                            <template x-for="(t, i) in parsedTransactions" :key="i">
+                                <div class="bg-gray-50 rounded-md p-3 border" :class="selected[i] ? 'border-purple-300' : 'border-gray-200'">
+                                    <div class="flex items-start justify-between">
+                                        <div class="grid grid-cols-2 gap-2 text-sm">
+                                            <div class="text-gray-500">Type:</div>
+                                            <div class="font-medium capitalize" :class="t.type === 'income' ? 'text-green-600' : 'text-red-600'" x-text="t.type"></div>
+
+                                            <div class="text-gray-500">Amount:</div>
+                                            <div class="font-medium" x-text="`${t.currency} ${t.amount}`"></div>
+
+                                            <div class="text-gray-500">Category:</div>
+                                            <div class="font-medium" x-text="t.category"></div>
+
+                                            <div class="text-gray-500">Date:</div>
+                                            <div class="font-medium" x-text="t.date"></div>
+
+                                            <template x-if="t.description">
+                                                <div class="text-gray-500">Description:</div>
+                                                <div class="font-medium" x-text="t.description"></div>
+                                            </template>
+                                        </div>
+                                        <label class="ml-4 inline-flex items-center space-x-2 cursor-pointer">
+                                            <input type="checkbox" class="rounded text-purple-600 focus:ring-purple-500" x-model="selected[i]"><span class="text-sm text-gray-700">Save</span>
+                                        </label>
+                                    </div>
+
+                                    <div x-show="t.confidence < 0.8" class="mt-2 flex items-start space-x-2 text-xs text-orange-600 bg-orange-50 rounded-md p-2">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        <span>Low confidence. Please review this item carefully.</span>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div x-show="parsedData?.confidence < 0.8" class="flex items-start space-x-2 text-sm text-orange-600 bg-orange-50 rounded-md p-2">
-                                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                                </svg>
-                                <span>Low confidence. Please review carefully.</span>
-                            </div>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -178,7 +185,7 @@
                     <button type="button" 
                             @click="confirmTransaction()"
                             class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm">
-                        Confirm & Save
+                        Confirm & Save Selected
                     </button>
                     <button type="button" 
                             @click="cancelConfirmation()"
@@ -201,7 +208,9 @@ function chatbot() {
         messages: [],
         unreadCount: 0,
         showConfirmation: false,
-        parsedData: null,
+    parsedData: null,
+    parsedTransactions: [],
+    selected: [],
 
         init() {
             // Load messages from localStorage
@@ -251,11 +260,18 @@ function chatbot() {
                 const data = await response.json();
 
                 if (data.success) {
-                    this.parsedData = data.data;
+                    // Normalize to array
+                    this.parsedTransactions = (data.data?.transactions || []);
+                    this.parsedData = { ai_log_id: data.data?.ai_log_id, requires_confirmation: data.data?.requires_confirmation };
+                    this.selected = this.parsedTransactions.map(() => true);
                     this.isTyping = false;
-                    
-                    // Show confirmation
-                    const confirmMsg = `I found a ${data.data.type} of ${data.data.currency} ${data.data.amount} for ${data.data.category}. Would you like to save this?`;
+
+                    // Summary message
+                    const count = this.parsedTransactions.length;
+                    const preview = this.parsedTransactions.map(t => `${t.description || t.category} ${t.currency} ${t.amount}`).join(', ');
+                    const confirmMsg = count > 1
+                        ? `I found ${count} transactions: ${preview}. Review and confirm which ones to save.`
+                        : `I found a ${this.parsedTransactions[0]?.type} of ${this.parsedTransactions[0]?.currency} ${this.parsedTransactions[0]?.amount} for ${this.parsedTransactions[0]?.category}. Save it?`;
                     this.addMessage('bot', confirmMsg);
                     this.showConfirmation = true;
                 } else {
@@ -274,32 +290,49 @@ function chatbot() {
             this.isTyping = true;
 
             try {
+                // Collect selected items
+                const items = this.parsedTransactions
+                    .map((t, i) => ({ t, i }))
+                    .filter(x => this.selected[x.i])
+                    .map(x => ({ ...x.t, ai_log_id: this.parsedData?.ai_log_id }));
+
+                if (items.length === 0) {
+                    this.isTyping = false;
+                    this.addMessage('bot', 'No items selected to save.');
+                    return;
+                }
+
+                const payload = items.length === 1
+                    ? { ...items[0] }
+                    : { ai_log_id: this.parsedData?.ai_log_id, transactions: items };
+
                 const response = await fetch('/api/chat/confirm-transaction', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify(this.parsedData)
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    this.addMessage('bot', '✅ Transaction saved successfully!');
-                    window.showToast('Transaction added successfully!', 'success');
-                    
-                    // Refresh page after 2 seconds
-                    setTimeout(() => window.location.reload(), 2000);
+                    const savedCount = (data.saved?.length) || 1;
+                    this.addMessage('bot', `✅ Saved ${savedCount} transaction${savedCount>1?'s':''} successfully!`);
+                    window.showToast('Transactions saved!', 'success');
+                    setTimeout(() => window.location.reload(), 1200);
                 } else {
-                    this.addMessage('bot', '❌ Failed to save transaction: ' + (data.message || 'Unknown error'));
+                    this.addMessage('bot', '❌ Failed to save: ' + (data.message || 'Unknown error'));
                 }
             } catch (error) {
-                this.addMessage('bot', '❌ Error saving transaction. Please try again.');
+                this.addMessage('bot', '❌ Error saving transaction(s). Please try again.');
                 console.error('Save error:', error);
             } finally {
                 this.isTyping = false;
                 this.parsedData = null;
+                this.parsedTransactions = [];
+                this.selected = [];
             }
         },
 

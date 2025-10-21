@@ -107,13 +107,15 @@
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
         const loadingState = document.getElementById('loadingState');
-        const confirmationModal = document.getElementById('confirmationModal');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalContent = document.getElementById('modalContent');
-        const confirmButton = document.getElementById('confirmButton');
-        const cancelButton = document.getElementById('cancelButton');
+    const confirmationModal = document.getElementById('confirmationModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    const confirmButton = document.getElementById('confirmButton');
+    const cancelButton = document.getElementById('cancelButton');
 
-        let pendingConfirmation = null;
+    let pendingConfirmation = null;
+    let pendingTransactions = [];
+    let selected = [];
 
         // Send message function
         function sendMessage() {
@@ -146,7 +148,13 @@
 
                     // Check if it's a transaction preview
                     if (data.type === 'transaction_preview') {
-                        showTransactionPreview(data);
+                        // Support multiple
+                        const txs = data.transactions && Array.isArray(data.transactions)
+                            ? data.transactions
+                            : (data.transaction ? [data.transaction] : []);
+                        pendingTransactions = txs;
+                        selected = txs.map(() => true);
+                        showTransactionPreviewList(txs);
                     }
                     // Check if it's a task preview
                     else if (data.type === 'task_preview') {
@@ -187,25 +195,42 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Show transaction preview modal
-        function showTransactionPreview(data) {
-            pendingConfirmation = data;
-            
-            modalTitle.textContent = 'Confirm Transaction';
-            const transaction = data.transaction;
-            const amount = parseFloat(transaction.amount).toFixed(2);
-            const categoryName = transaction.category ? transaction.category.name : 'Uncategorized';
-            
-            modalContent.innerHTML = `
-                <div class="text-left space-y-2">
-                    <p><strong>Type:</strong> ${transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}</p>
-                    <p><strong>Amount:</strong> ৳${amount}</p>
-                    <p><strong>Category:</strong> ${categoryName}</p>
-                    <p><strong>Description:</strong> ${transaction.description}</p>
-                    <p><strong>Date:</strong> ${transaction.date}</p>
-                </div>
-            `;
-            
+        // Show multi-transaction preview modal
+        function showTransactionPreviewList(transactions) {
+            pendingConfirmation = { kind: 'transactions' };
+            modalTitle.textContent = `Confirm Transaction${transactions.length>1?'s':''}`;
+            const rows = transactions.map((t, idx) => {
+                const amount = parseFloat(t.amount || 0).toFixed(2);
+                const cat = t.category?.name || t.category || 'Uncategorized';
+                const type = (t.type||'expense');
+                const date = t.date || new Date().toISOString().slice(0,10);
+                const desc = t.description || '';
+                const checked = selected[idx] ? 'checked' : '';
+                return `
+                    <div class="flex items-start justify-between bg-white/5 border border-white/20 rounded-lg p-3 mb-2">
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-white">
+                            <div class="text-gray-300">Type:</div><div class="font-medium ${type==='income'?'text-green-300':'text-red-300'}">${type}</div>
+                            <div class="text-gray-300">Amount:</div><div class="font-medium">৳${amount}</div>
+                            <div class="text-gray-300">Category:</div><div class="font-medium">${cat}</div>
+                            <div class="text-gray-300">Date:</div><div class="font-medium">${date}</div>
+                            ${desc?`<div class="text-gray-300">Description:</div><div class="font-medium">${desc}</div>`:''}
+                        </div>
+                        <label class="ml-3 inline-flex items-center space-x-2 text-white">
+                            <input type="checkbox" ${checked} data-index="${idx}" class="transaction-select rounded">
+                            <span class="text-sm">Save</span>
+                        </label>
+                    </div>`;
+            }).join('');
+            modalContent.innerHTML = `<div>${rows}</div>`;
+            // Attach change listeners
+            setTimeout(() => {
+                modalContent.querySelectorAll('.transaction-select').forEach(cb => {
+                    cb.addEventListener('change', (e) => {
+                        const i = parseInt(e.target.getAttribute('data-index'));
+                        selected[i] = e.target.checked;
+                    });
+                });
+            }, 0);
             confirmationModal.classList.remove('hidden');
         }
 
@@ -236,11 +261,19 @@
         confirmButton.addEventListener('click', function() {
             if (!pendingConfirmation) return;
 
-            // Determine if it's a transaction or task
+            // Determine if it's a transaction list or task
             let url, data;
-            if (pendingConfirmation.transaction) {
+            if (pendingConfirmation && pendingConfirmation.kind === 'transactions') {
                 url = '{{ route("chatbot.confirm") }}';
-                data = pendingConfirmation.transaction;
+                const items = pendingTransactions.filter((t, i) => selected[i]).map(t => ({
+                    amount: t.amount,
+                    type: t.type,
+                    description: t.description || (t.category?.name || t.category || 'Transaction'),
+                    date: t.date,
+                    currency: t.currency || 'BDT',
+                    category: t.category && typeof t.category === 'object' ? t.category : (t.category ? { name: t.category } : null),
+                }));
+                data = items.length > 1 ? { transactions: items } : (items[0] || {});
             } else if (pendingConfirmation.task) {
                 url = '{{ route("chatbot.confirm-task") }}';
                 data = pendingConfirmation.task;
@@ -278,6 +311,8 @@
         function hideConfirmationModal() {
             confirmationModal.classList.add('hidden');
             pendingConfirmation = null;
+            pendingTransactions = [];
+            selected = [];
         }
 
         // Event listeners

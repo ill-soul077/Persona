@@ -77,17 +77,37 @@ class ChatController extends Controller
             // Call Gemini service to parse the text
             $parsed = $this->geminiService->parseFinanceText($rawText);
 
-            // Determine requires confirmation based on confidence
-            $requiresConfirmation = isset($parsed['confidence']) && $parsed['confidence'] < 0.6;
+            // Normalize to transactions array
+            $transactions = [];
+            if (isset($parsed['transactions']) && is_array($parsed['transactions'])) {
+                $transactions = $parsed['transactions'];
+            } else {
+                // backward compatible single object
+                $transactions = [ [
+                    'type' => $parsed['type'] ?? 'expense',
+                    'amount' => $parsed['amount'] ?? 0,
+                    'currency' => $parsed['currency'] ?? 'BDT',
+                    'category' => $parsed['category'] ?? 'other',
+                    'description' => $parsed['description'] ?? $rawText,
+                    'meta' => $parsed['meta'] ?? [],
+                    'date' => $parsed['date'] ?? now()->toIso8601String(),
+                    'confidence' => $parsed['confidence'] ?? 0.5,
+                ] ];
+            }
+
+            // Determine requires confirmation if any has low confidence
+            $requiresConfirmation = collect($transactions)->contains(function ($t) {
+                return ($t['confidence'] ?? 0.0) < 0.6;
+            });
 
             // Create AI log entry
             $aiLog = AiLog::create([
                 'user_id' => $userId,
                 'module' => 'finance',
                 'raw_text' => $rawText,
-                'parsed_json' => $parsed,
+                'parsed_json' => ['transactions' => $transactions],
                 'model' => 'gemini',
-                'confidence' => $parsed['confidence'] ?? null,
+                'confidence' => count($transactions) ? (collect($transactions)->avg('confidence')) : null,
                 'status' => $requiresConfirmation ? 'pending_review' : 'parsed',
                 'ip_address' => $ipAddress,
             ]);
@@ -96,30 +116,32 @@ class ChatController extends Controller
             $lowConfidence = isset($parsed['confidence']) && $parsed['confidence'] < 0.6;
 
             // Apply fallback rules if needed
-            if (isset($parsed['error']) || empty($parsed['amount'])) {
-                $parsed = $this->applyFallbackRules($rawText, $parsed);
-            }
-
-            // Align response shape with tests: data, requires_confirmation, fallback_used
-            // Enrich parsed data with ai_log_id so client can confirm later
-            $responseData = array_merge($parsed, [
-                'requires_confirmation' => $lowConfidence,
-                'ai_log_id' => $aiLog->id,
-            ]);
-
-            // Simple vendor extraction if meta not provided
-            if (!isset($responseData['meta']['vendor'])) {
-                if (preg_match('/(?:at|from)\s+([A-Za-z0-9 &\-]+)(?:\s|$)/', $rawText, $vm)) {
-                    $responseData['meta']['vendor'] = trim($vm[1]);
+            // If AI indicated failure, use regex fallback to split multiple
+            if (isset($parsed['error'])) {
+                $fallback = $this->applyFallbackRules($rawText, []);
+                if (isset($fallback['transactions'])) {
+                    $transactions = $fallback['transactions'];
+                } else {
+                    $transactions = [ $fallback ];
                 }
             }
 
+            // Enrich each with ai_log_id for confirm
+            $transactions = array_map(function ($t) use ($aiLog) {
+                $t['ai_log_id'] = $aiLog->id;
+                return $t;
+            }, $transactions);
+
             return response()->json([
                 'success' => true,
-                'data' => $responseData,
+                'data' => [
+                    'transactions' => $transactions,
+                    'requires_confirmation' => $requiresConfirmation,
+                    'ai_log_id' => $aiLog->id,
+                ],
                 'fallback_used' => (bool)($parsed['fallback_used'] ?? false),
                 'ai_log_id' => $aiLog->id,
-                'message' => 'Transaction parsed successfully. Please review and confirm.',
+                'message' => 'Parsed successfully. Please review and confirm.',
             ]);
 
         } catch (\Exception $e) {
@@ -141,11 +163,12 @@ class ChatController extends Controller
                 'ip_address' => $ipAddress,
             ]);
 
-            // On failure, try fallback parsing to satisfy tests
+            // On failure, try fallback parsing (multi supported)
             $fallback = $this->applyFallbackRules($rawText, []);
+            $transactions = isset($fallback['transactions']) ? $fallback['transactions'] : [ $fallback ];
             return response()->json([
                 'success' => true,
-                'data' => $fallback,
+                'data' => [ 'transactions' => $transactions, 'requires_confirmation' => true, 'ai_log_id' => null ],
                 'fallback_used' => true,
                 'message' => 'Parsed using fallback rules due to AI error.',
             ], 200);
@@ -159,70 +182,68 @@ class ChatController extends Controller
      */
     protected function applyFallbackRules(string $rawText, array $geminiResult): array
     {
-        $text = strtolower($rawText);
-        
-        // Extract amount (supports: 30, 30.50, 30 taka, $30)
-        preg_match('/(\d+(?:\.\d{1,2})?)\s*(taka|tk|dollar|usd|\$)?/i', $rawText, $amountMatch);
-        $amount = isset($amountMatch[1]) ? (float)$amountMatch[1] : 0;
-        
-        // Detect currency
-        $currency = 'BDT'; // Default to Bangladeshi Taka
-        if (isset($amountMatch[2])) {
-            $currencyMap = [
-                'dollar' => 'USD',
-                'usd' => 'USD',
-                '$' => 'USD',
-                'taka' => 'BDT',
-                'tk' => 'BDT',
-            ];
-            $currency = $currencyMap[strtolower($amountMatch[2])] ?? 'BDT';
-        }
-        
-        // Detect type (income vs expense)
-        $type = 'expense'; // Default
-        $incomeKeywords = ['received', 'earned', 'got', 'income', 'salary', 'tuition'];
-        foreach ($incomeKeywords as $keyword) {
-            if (str_contains($text, $keyword)) {
-                $type = 'income';
-                break;
+        // Multi-chunk fallback: split and parse each
+        $chunks = preg_split('/(?<=[\.\!\?])\s+|\n+|\s+and\s+/i', $rawText);
+        $items = [];
+        foreach ($chunks as $chunk) {
+            $chunk = trim($chunk);
+            if ($chunk === '') continue;
+
+            $text = strtolower($chunk);
+            preg_match('/(\d+(?:\.\d{1,2})?)\s*(taka|tk|dollar|usd|\$)?/i', $chunk, $amountMatch);
+            $amount = isset($amountMatch[1]) ? (float)$amountMatch[1] : 0;
+            $currency = 'BDT';
+            if (isset($amountMatch[2])) {
+                $curTok = strtolower($amountMatch[2]);
+                $currency = in_array($curTok, ['dollar','usd','$']) ? 'USD' : 'BDT';
+            } else if (preg_match('/\b(usd|dollar|\$)\b/i', $chunk)) {
+                $currency = 'USD';
             }
-        }
-        
-        // Extract category/vendor keywords
-        $category = 'other';
-        $categoryKeywords = [
-            'food' => ['food', 'burger', 'pizza', 'lunch', 'dinner', 'breakfast', 'meal'],
-            'fast_food' => ['burger', 'mcdonald', 'kfc', 'pizza', 'fastfood'],
-            'coffee_snacks' => ['coffee', 'tea', 'starbucks', 'cafe'],
-            'transport' => ['uber', 'taxi', 'bus', 'train', 'fuel', 'gas'],
-            'education' => ['book', 'tuition', 'course', 'class'],
-        ];
-        
-        foreach ($categoryKeywords as $cat => $keywords) {
-            foreach ($keywords as $keyword) {
-                if (str_contains($text, $keyword)) {
-                    $category = $cat;
-                    break 2;
+
+            $type = 'expense';
+            foreach (['received','earned','got','income','salary','tuition'] as $kw) {
+                if (str_contains($text, $kw)) { $type = 'income'; break; }
+            }
+
+            $category = 'other';
+            $categoryKeywords = [
+                'fast_food' => ['burger','pizza','kfc','mcdonald'],
+                'coffee_snacks' => ['coffee','tea','cafe','starbucks'],
+                'food' => ['food','lunch','dinner','breakfast','meal'],
+                'clothing' => ['dress','shirt','clothes','jeans'],
+                'transport' => ['uber','taxi','bus','train','fuel','gas'],
+            ];
+            foreach ($categoryKeywords as $cat => $keywords) {
+                foreach ($keywords as $keyword) {
+                    if (str_contains($text, $keyword)) { $category = $cat; break 2; }
                 }
             }
-        }
-        
-        // Extract vendor/description (text after "on" or "at")
-        $description = $rawText;
-        if (preg_match('/(on|at|for)\s+(.+)$/i', $rawText, $descMatch)) {
-            $description = trim($descMatch[2]);
+
+            $description = $chunk;
+            if (preg_match('/(on|at|for)\s+(.+)$/i', $chunk, $descMatch)) {
+                $description = trim($descMatch[2]);
+            } else {
+                foreach (['burger','pizza','coffee','tea','dress','gift'] as $kw) {
+                    if (str_contains($text, $kw)) { $description = $kw; break; }
+                }
+            }
+
+            $items[] = [
+                'type' => $type,
+                'amount' => $amount,
+                'currency' => $currency,
+                'category' => $category,
+                'description' => $description,
+                'date' => now()->toDateString(),
+                'meta' => [],
+                'confidence' => $amount > 0 ? 0.6 : 0.3,
+            ];
         }
 
-        return array_merge($geminiResult, [
-            'type' => $geminiResult['type'] ?? $type,
-            'amount' => $geminiResult['amount'] ?? $amount,
-            'currency' => $geminiResult['currency'] ?? $currency,
-            'category' => $geminiResult['category'] ?? $category,
-            'description' => $geminiResult['description'] ?? $description,
-            'date' => $geminiResult['date'] ?? now()->toIso8601String(),
-            'confidence' => max($geminiResult['confidence'] ?? 0.5, 0.5),
+        return [
+            'transactions' => $items,
             'fallback_used' => true,
-        ]);
+        ];
     }
 
     /**
@@ -283,17 +304,36 @@ class ChatController extends Controller
      */
     public function confirmTransaction(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        // Accept either a single object or an array of transactions
+        $data = $request->all();
+        $isBatch = isset($data['transactions']) && is_array($data['transactions']);
+
+        $rulesSingle = [
             'ai_log_id' => 'required|exists:ai_logs,id',
             'type' => 'required|in:income,expense',
             'amount' => 'required|numeric|min:0.01',
             'currency' => 'required|string|size:3',
             'date' => 'required|date',
-            // Allow either category_id or category slug
             'category_id' => 'nullable|integer',
             'category' => 'nullable|string',
             'description' => 'nullable|string|max:1000',
-        ]);
+        ];
+
+        if ($isBatch) {
+            $validator = Validator::make($data, [
+                'ai_log_id' => 'required|exists:ai_logs,id',
+                'transactions' => 'required|array|min:1',
+                'transactions.*.type' => 'required|in:income,expense',
+                'transactions.*.amount' => 'required|numeric|min:0.01',
+                'transactions.*.currency' => 'required|string|size:3',
+                'transactions.*.date' => 'required|date',
+                'transactions.*.category_id' => 'nullable|integer',
+                'transactions.*.category' => 'nullable|string',
+                'transactions.*.description' => 'nullable|string|max:1000',
+            ]);
+        } else {
+            $validator = Validator::make($data, $rulesSingle);
+        }
 
         if ($validator->fails()) {
             return response()->json([
@@ -303,38 +343,54 @@ class ChatController extends Controller
         }
 
         try {
-            // Mark AI log as applied
-            $aiLog = AiLog::findOrFail($request->ai_log_id);
+            $aiLog = AiLog::findOrFail($data['ai_log_id']);
 
-            // Map category slug to id if needed
-            $payload = $request->all();
-            if (empty($payload['category_id']) && !empty($payload['category'])) {
-                if ($payload['type'] === 'income') {
-                    $source = \App\Models\IncomeSource::where('slug', $payload['category'])->first();
-                    if ($source) { $payload['category_id'] = $source->id; }
+            $saved = [];
+            $toSave = $isBatch ? $data['transactions'] : [ $data ];
+            $transactionController = app(TransactionController::class);
+
+            foreach ($toSave as $idx => $payload) {
+                // Map category slug to id if needed
+                if (empty($payload['category_id']) && !empty($payload['category'])) {
+                    if (($payload['type'] ?? 'expense') === 'income') {
+                        $source = \App\Models\IncomeSource::where('slug', $payload['category'])->first();
+                        if ($source) { $payload['category_id'] = $source->id; }
+                    } else {
+                        $cat = \App\Models\ExpenseCategory::where('slug', $payload['category'])->first();
+                        if ($cat) { $payload['category_id'] = $cat->id; }
+                    }
+                }
+
+                if (isset($payload['vendor'])) {
+                    $payload['meta']['vendor'] = $payload['vendor'];
+                }
+
+                // Build Request instance per item and force JSON
+                $itemReq = new Request($payload);
+                $itemReq->headers->set('Accept', 'application/json');
+                $itemReq->headers->set('Content-Type', 'application/json');
+                $resp = $transactionController->store($itemReq);
+                if (method_exists($resp, 'getStatusCode') && $resp->getStatusCode() === 200) {
+                    $saved[] = json_decode($resp->getContent(), true)['transaction'] ?? null;
                 } else {
-                    $cat = \App\Models\ExpenseCategory::where('slug', $payload['category'])->first();
-                    if ($cat) { $payload['category_id'] = $cat->id; }
+                    // If any fails, continue and report partial success
+                    Log::warning('Batch transaction item failed to save', ['index' => $idx]);
                 }
             }
 
-            // Ensure meta/vendor passes through if provided
-            if (isset($payload['vendor'])) {
-                $payload['meta']['vendor'] = $payload['vendor'];
-            }
-
-            // Update request with resolved payload
-            $request->replace($payload);
-
-            // Delegate to TransactionController->store
-            $transactionController = app(TransactionController::class);
-            $response = $transactionController->store($request);
-
-            if ($response->getStatusCode() === 200) {
+            if (count($saved) > 0) {
                 $aiLog->markAsApplied();
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transactions saved successfully',
+                    'saved' => $saved,
+                ]);
             }
 
-            return $response;
+            return response()->json([
+                'success' => false,
+                'message' => 'No transactions were saved',
+            ], 422);
 
         } catch (\Exception $e) {
             return response()->json([

@@ -75,24 +75,47 @@ class ChatbotController extends Controller
 
     private function handleTransactionMessage(string $message, $user)
     {
-        // Parse the transaction from natural language
-        $parsed = $this->transactionParser->parseTransaction($message);
-
-        // If we couldn't extract essential information, ask for clarification
-        if (!$parsed['amount'] || $parsed['confidence'] < 0.5) {
-            return response()->json([
-                'success' => true,
-                'type' => 'clarification',
-                'message' => "I couldn't fully understand your transaction. Could you please specify the amount and what you spent on or earned? For example: 'spent 25 taka on coffee' or 'received 5000 salary'"
-            ]);
+        // Support multiple transactions in one message by splitting into chunks
+        $chunks = preg_split('/(?<=[\.!\?])\s+|\n+|\s+and\s+/i', $message);
+        $transactions = [];
+        foreach ($chunks as $chunk) {
+            $chunk = trim($chunk);
+            if ($chunk === '') continue;
+            $t = $this->transactionParser->parseTransaction($chunk);
+            if (!empty($t['amount'])) {
+                // Ensure required defaults
+                $t['currency'] = $t['currency'] ?? 'BDT';
+                $t['date'] = $t['date'] ?? now()->format('Y-m-d');
+                $transactions[] = $t;
+            }
         }
 
-        // Return transaction preview for confirmation
+        // Fallback to single parse if nothing split out
+        if (empty($transactions)) {
+            $parsed = $this->transactionParser->parseTransaction($message);
+            if (!$parsed['amount'] || $parsed['confidence'] < 0.5) {
+                return response()->json([
+                    'success' => true,
+                    'type' => 'clarification',
+                    'message' => "I couldn't fully understand your transaction. Could you please specify the amount and what you spent on or earned? For example: 'spent 25 taka on coffee' or 'received 5000 salary'"
+                ]);
+            }
+            $transactions = [$parsed];
+        }
+
+        // Build a concise summary message
+        $count = count($transactions);
+        $summary = $count > 1
+            ? ('I found ' . $count . ' transactions. Please review and confirm which ones to save.')
+            : $this->formatTransactionPreview($transactions[0]);
+
         return response()->json([
             'success' => true,
             'type' => 'transaction_preview',
-            'message' => $this->formatTransactionPreview($parsed),
-            'transaction' => $parsed
+            'message' => $summary,
+            // Keep backward-compat single object while adding array support
+            'transaction' => $transactions[0],
+            'transactions' => $transactions,
         ]);
     }
 
@@ -144,70 +167,93 @@ class ChatbotController extends Controller
 
     public function confirmTransaction(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $data = $request->all();
+        $isBatch = isset($data['transactions']) && is_array($data['transactions']);
+
+        // Validation rules
+        $rulesSingle = [
             'amount' => 'required|numeric|min:0.01',
             'type' => 'required|in:income,expense',
             'description' => 'required|string|max:255',
             'category' => 'nullable|array',
             'date' => 'required|date'
-        ]);
+        ];
+
+        $validator = $isBatch
+            ? Validator::make($data, [
+                'transactions' => 'required|array|min:1',
+                'transactions.*.amount' => 'required|numeric|min:0.01',
+                'transactions.*.type' => 'required|in:income,expense',
+                'transactions.*.description' => 'required|string|max:255',
+                'transactions.*.category' => 'nullable|array',
+                'transactions.*.date' => 'required|date',
+            ])
+            : Validator::make($data, $rulesSingle);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid transaction data provided.'
+                'message' => 'Invalid transaction data provided.',
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         try {
-            DB::beginTransaction();
-
             $user = Auth::user();
-            $data = $request->all();
+            $items = $isBatch ? $data['transactions'] : [ $data ];
+            $saved = [];
 
-            // Prepare transaction data
-            $transactionData = [
-                'user_id' => $user->id,
-                'amount' => $data['amount'],
-                'type' => $data['type'],
-                'description' => $data['description'],
-                'date' => $data['date'],
-                'currency' => 'BDT', // Default currency
-            ];
+            foreach ($items as $item) {
+                DB::beginTransaction();
+                try {
+                    $transactionData = [
+                        'user_id' => $user->id,
+                        'amount' => $item['amount'],
+                        'type' => $item['type'],
+                        'description' => $item['description'] ?? 'Transaction',
+                        'date' => $item['date'],
+                        'currency' => strtoupper($item['currency'] ?? 'BDT'),
+                    ];
 
-            // Add category using polymorphic relationship
-            if (isset($data['category']['id'])) {
-                $transactionData['category_id'] = $data['category']['id'];
-                if ($data['type'] === 'expense') {
-                    $transactionData['category_type'] = 'App\Models\ExpenseCategory';
-                } else {
-                    $transactionData['category_type'] = 'App\Models\IncomeSource';
+                    // Category polymorphic mapping (support parser object)
+                    if (isset($item['category']['id'])) {
+                        $transactionData['category_id'] = $item['category']['id'];
+                        $transactionData['category_type'] = $item['type'] === 'expense'
+                            ? ExpenseCategory::class
+                            : IncomeSource::class;
+                    }
+
+                    $tx = Transaction::create($transactionData);
+                    DB::commit();
+                    $saved[] = $tx->load(['category', 'source']);
+                } catch (\Exception $inner) {
+                    DB::rollBack();
+                    Log::warning('Failed to save one item in batch', [ 'error' => $inner->getMessage(), 'item' => $item ]);
+                    // continue with others
                 }
             }
 
-            // Create the transaction
-            $transaction = Transaction::create($transactionData);
-
-            DB::commit();
+            if (count($saved) === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No transactions were saved.'
+                ], 422);
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Transaction added successfully! 💰',
-                'transaction' => $transaction->load(['category', 'source'])
+                'message' => 'Transaction' . (count($saved) > 1 ? 's' : '') . ' added successfully! 💰',
+                'saved' => $saved,
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Transaction creation error: ' . $e->getMessage());
             Log::error('Transaction data: ' . json_encode($request->all()));
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to save transaction. Error: ' . $e->getMessage(),
-                'debug' => [
-                    'error' => $e->getMessage(),
-                    'data' => $request->all()
-                ]
+                'message' => 'Failed to save transaction(s). Error: ' . $e->getMessage(),
+                'debug' => [ 'error' => $e->getMessage(), 'data' => $request->all() ]
             ], 500);
         }
     }

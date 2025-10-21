@@ -248,30 +248,29 @@ class GeminiService
     /**
      * Build prompt for finance text parsing
      */
-    protected function buildFinancePrompt(string $rawText): string
+        protected function buildFinancePrompt(string $rawText): string
     {
         $currentDate = now()->toIso8601String();
         
-        return <<<PROMPT
-You are a financial transaction parser. Extract structured data from natural language input.
+                return <<<PROMPT
+You are a financial transaction parser. Extract one or more structured transactions from natural language input.
 
 Input: "{$rawText}"
 
-Extract the following information and return ONLY valid JSON (no markdown, no explanation, no code blocks):
+Return ONLY valid JSON (no markdown, no explanation, no code blocks) in this exact shape:
 {
-    "type": "income" or "expense",
-    "amount": numeric value,
-    "currency": "BDT" or "USD" (detect from context: taka/tk = BDT, dollar/$ = USD, default BDT),
-    "category": category slug from list below,
-    "description": brief description or item purchased,
-    "date": ISO 8601 date (default: "{$currentDate}"),
-    "meta": {
-        "vendor": vendor name if mentioned,
-        "location": location if mentioned,
-        "tax": tax amount if mentioned,
-        "tip": tip amount if mentioned
-    },
-    "confidence": your confidence score (0.0 to 1.0)
+    "transactions": [
+        {
+            "type": "income" | "expense",
+            "amount": number,
+            "currency": "BDT" | "USD", // detect: taka/tk=BDT, dollar/$=USD, default BDT
+            "category": string, // slug from list below
+            "description": string, // brief item/reason
+            "date": "{$currentDate}", // ISO 8601 (default current)
+            "meta": { "vendor": string|null, "location": string|null, "tax": number|null, "tip": number|null },
+            "confidence": number // 0.0 - 1.0
+        }
+    ]
 }
 
 CATEGORY SLUGS:
@@ -279,21 +278,21 @@ Income: from_home, tuition, freelance, part_time_job, investment, gift, other
 Expense: food, fast_food, groceries, dining_out, coffee_snacks, clothing, education, books_supplies, tuition_fees, transport, fuel, public_transit, ride_sharing, entertainment, health, other
 
 RULES:
+- If multiple expenses/incomes appear separated by punctuation or conjunctions, output each as a separate object in transactions[]
 - Type detection: "spent", "paid", "bought", "drank" → expense | "received", "earned", "got", "income" → income
-- Extract amounts: "30 taka", "5000 tk", "$25", "150" → numeric only
+- Amounts: support "30 taka", "5000 tk", "$25", "150" (numeric only in amount)
 - Currency: "taka", "tk" → BDT | "dollar", "$", "usd" → USD | default → BDT
-- Category mapping: "burger", "food" → fast_food | "tea", "coffee" → coffee_snacks | "tuition" → tuition (if income) or tuition_fees (if expense)
-- Description: Extract item/reason from "on burger", "for coffee", etc.
+- Category mapping: "burger", "food" → fast_food | "tea", "coffee" → coffee_snacks | "tuition" → tuition (income) or tuition_fees (expense) | "dress", "shirt", "clothes" → clothing | "gift" → other
+- Description: Extract item/reason from phrases like "on burger", "for coffee", etc.
 - Vendor: "at Starbucks", "from McDonald's" → vendor name
 - Confidence: 0.9+ if all fields clear, 0.7-0.8 if some ambiguity, <0.6 if unclear
 
 EXAMPLES:
-"spent 30 taka on burger" → {"type":"expense","amount":30,"currency":"BDT","category":"fast_food","description":"burger","date":"{$currentDate}","meta":{},"confidence":0.95}
-"received 5000 taka tuition" → {"type":"income","amount":5000,"currency":"BDT","category":"tuition","description":"tuition payment","date":"{$currentDate}","meta":{},"confidence":0.92}
-"paid 150 for coffee at Starbucks downtown" → {"type":"expense","amount":150,"currency":"BDT","category":"coffee_snacks","description":"coffee","date":"{$currentDate}","meta":{"vendor":"Starbucks","location":"downtown"},"confidence":0.98}
+"spent 30 taka on burger" → {"transactions":[{"type":"expense","amount":30,"currency":"BDT","category":"fast_food","description":"burger","date":"{$currentDate}","meta":{},"confidence":0.95}]}
+"received 5000 taka tuition" → {"transactions":[{"type":"income","amount":5000,"currency":"BDT","category":"tuition","description":"tuition payment","date":"{$currentDate}","meta":{},"confidence":0.92}]}
+"brought dress 300 taka. drank tea 30 taka" → {"transactions":[{"type":"expense","amount":300,"currency":"BDT","category":"clothing","description":"dress","date":"{$currentDate}","meta":{},"confidence":0.9},{"type":"expense","amount":30,"currency":"BDT","category":"coffee_snacks","description":"tea","date":"{$currentDate}","meta":{},"confidence":0.95}]}
 
-NOW PARSE: "{$rawText}"
-Return ONLY the JSON object, no other text.
+Return ONLY the JSON object.
 PROMPT;
     }
 
@@ -638,7 +637,30 @@ PROMPT;
             throw new \Exception('Invalid JSON response from Gemini');
         }
 
-        return $data;
+        // Normalize to transactions[] shape
+        if (isset($data['transactions']) && is_array($data['transactions'])) {
+            // Ensure currency and date defaults per item
+            foreach ($data['transactions'] as &$t) {
+                $t['currency'] = $t['currency'] ?? 'BDT';
+                // Normalize date to Y-m-d to pass before_or_equal:today rule
+                $t['date'] = isset($t['date']) ? (\Carbon\Carbon::parse($t['date'])->toDateString()) : now()->toDateString();
+                $t['meta'] = $t['meta'] ?? [];
+                $t['confidence'] = (float)($t['confidence'] ?? ($t['amount'] ? 0.8 : 0.3));
+            }
+            return $data;
+        }
+
+        // Backward compatibility: single object → wrap
+        if (isset($data['type']) && isset($data['amount'])) {
+            $data['currency'] = $data['currency'] ?? 'BDT';
+            $data['date'] = isset($data['date']) ? (\Carbon\Carbon::parse($data['date'])->toDateString()) : now()->toDateString();
+            $data['meta'] = $data['meta'] ?? [];
+            $single = $data;
+            return [ 'transactions' => [ $single ] ];
+        }
+
+        // If nothing recognized, attempt simple split & parse locally
+        return $this->getFinanceFallback($rawText, 'Invalid AI schema');
     }
 
     /**
@@ -666,57 +688,80 @@ PROMPT;
      */
     protected function getFinanceFallback(string $rawText, string $error): array
     {
-        $text = strtolower($rawText);
-        // extract amount in various formats ONLY when currency is explicitly present
-        // (reconciling two unit tests with different expectations)
-        $amount = 0.0;
-        $hasCurrencyToken = preg_match('/\$|usd|dollar|dollars|[৳]|bdt|taka|tk/i', $rawText) === 1;
-        if ($hasCurrencyToken && preg_match('/(?:(?:\$|৳|tk)\s*)?([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)(?:\.([0-9]{1,2}))?/i', $rawText, $m)) {
-            $intPart = str_replace(',', '', $m[1]);
-            $decPart = isset($m[2]) ? ('.' . $m[2]) : '';
-            $amount = (float)($intPart . $decPart);
-        }
+        // Split input into sentences/clauses by period, newline, or ' and ' when amounts present
+        $chunks = preg_split('/(?<=[\.\!\?])\s+|\n+|\s+and\s+/i', $rawText);
+        $transactions = [];
 
-        // detect currency
-        $currency = 'BDT';
-        if (preg_match('/\$/', $rawText) || preg_match('/\b(usd|dollar|dollars)\b/i', $rawText)) {
-            $currency = 'USD';
-        } elseif (preg_match('/[৳]|\b(bdt|taka|tk)\b/i', $rawText)) {
-            $currency = 'BDT';
-        }
+        foreach ($chunks as $chunk) {
+            $chunk = trim($chunk);
+            if ($chunk === '') continue;
 
-        // detect type
-        $type = preg_match('/\b(received|earned|got|income|salary)\b/i', $text) ? 'income' : 'expense';
-
-        // simple category mapping
-        $category = 'other';
-        $map = [
-            'groceries' => ['grocery', 'groceries', 'supermarket'],
-            'transport' => ['uber', 'ride', 'taxi', 'bus', 'train', 'transport'],
-            'entertainment' => ['movie', 'netflix', 'subscription', 'cinema'],
-            'healthcare' => ['doctor', 'hospital', 'medicine', 'health'],
-            'utilities' => ['electricity', 'water bill', 'gas bill', 'utility'],
-            'fast_food' => ['burger', 'pizza', 'kfc', 'mcdonald'],
-            'coffee_snacks' => ['coffee', 'tea', 'cafe', 'starbucks'],
-            'salary' => ['salary'],
-        ];
-        foreach ($map as $cat => $terms) {
-            foreach ($terms as $term) {
-                if (str_contains($text, $term)) { $category = $cat; break 2; }
+            $text = strtolower($chunk);
+            // Extract amount if currency token exists for this chunk
+            $amount = 0.0;
+            $hasCurrencyToken = preg_match('/\$|usd|dollar|dollars|[৳]|bdt|taka|tk/i', $chunk) === 1;
+            if ($hasCurrencyToken && preg_match('/(?:(?:\$|৳|tk)\s*)?([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)(?:\.([0-9]{1,2}))?/i', $chunk, $m)) {
+                $intPart = str_replace(',', '', $m[1]);
+                $decPart = isset($m[2]) ? ('.' . $m[2]) : '';
+                $amount = (float)($intPart . $decPart);
             }
+
+            // detect currency
+            $currency = 'BDT';
+            if (preg_match('/\$|\b(usd|dollar|dollars)\b/i', $chunk)) {
+                $currency = 'USD';
+            } elseif (preg_match('/[৳]|\b(bdt|taka|tk)\b/i', $chunk)) {
+                $currency = 'BDT';
+            }
+
+            // detect type
+            $type = preg_match('/\b(received|earned|got|income|salary)\b/i', $text) ? 'income' : 'expense';
+
+            // category mapping including clothing, gift
+            $category = 'other';
+            $map = [
+                'groceries' => ['grocery', 'groceries', 'supermarket'],
+                'transport' => ['uber', 'ride', 'taxi', 'bus', 'train', 'transport'],
+                'entertainment' => ['movie', 'netflix', 'subscription', 'cinema'],
+                'health' => ['doctor', 'hospital', 'medicine', 'health'],
+                'utilities' => ['electricity', 'water bill', 'gas bill', 'utility'],
+                'fast_food' => ['burger', 'pizza', 'kfc', 'mcdonald'],
+                'coffee_snacks' => ['coffee', 'tea', 'cafe', 'starbucks'],
+                'clothing' => ['dress', 'shirt', 'clothes', 'jeans', 't-shirt'],
+            ];
+            foreach ($map as $cat => $terms) {
+                foreach ($terms as $term) {
+                    if (str_contains($text, $term)) { $category = $cat; break 2; }
+                }
+            }
+
+            // description heuristics: after 'on/for' else first noun-ish word
+            $description = $chunk;
+            if (preg_match('/(?:on|for)\s+([^\.]+)$/i', $chunk, $dm)) {
+                $description = trim($dm[1]);
+            } else {
+                // Try common items
+                foreach (['burger','pizza','coffee','tea','dress','shirt','gift'] as $kw) {
+                    if (str_contains($text, $kw)) { $description = $kw; break; }
+                }
+            }
+
+            $transactions[] = [
+                'type' => $type,
+                'amount' => $amount,
+                'currency' => $currency,
+                'category' => $category,
+                'description' => $description,
+                'meta' => [],
+                'date' => now()->toDateString(),
+                'confidence' => $amount > 0 ? 0.7 : 0.0,
+            ];
         }
 
         return [
-            'type' => $type,
-            'amount' => $amount,
-            'currency' => $currency,
-            'category' => $category,
-            'description' => $rawText,
-            'meta' => [],
-            'confidence' => $amount > 0 ? 0.7 : 0.0,
+            'transactions' => $transactions,
             'error' => $error,
             'fallback_used' => true,
-            'requires_confirmation' => $amount > 0 ? false : true,
         ];
     }
 
