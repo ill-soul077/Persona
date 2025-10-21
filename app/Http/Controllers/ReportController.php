@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\TaskAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -10,8 +11,15 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
+    protected TaskAnalyticsService $taskAnalytics;
+
+    public function __construct(TaskAnalyticsService $taskAnalytics)
+    {
+        $this->taskAnalytics = $taskAnalytics;
+    }
+
     /**
-     * Display the reports page with financial data.
+     * Display the reports page with financial and task analytics data.
      */
     public function index(Request $request)
     {
@@ -111,6 +119,35 @@ class ReportController extends Controller
             ? (($currentYearTotal - $lastYearTotal) / $lastYearTotal) * 100 
             : 0;
         
+        // Task Analytics Data
+        $taskPeriod = $request->input('task_period', 30); // default 30 days
+        $taskStartDate = $request->input('task_start_date', Carbon::now()->subDays($taskPeriod)->format('Y-m-d'));
+        $taskEndDate = $request->input('task_end_date', Carbon::now()->format('Y-m-d'));
+        
+        // Get task metrics
+        $taskMetrics = $this->taskAnalytics->getOverviewMetrics($user->id);
+        
+        // Get task completion trend
+        $completionTrend = $this->taskAnalytics->getCompletionTrend($taskStartDate, $taskEndDate, $user->id);
+        
+        // Get priority distribution
+        $priorityDistribution = $this->taskAnalytics->getPriorityDistribution($user->id, [
+            'start_date' => $taskStartDate,
+            'end_date' => $taskEndDate
+        ]);
+        
+        // Get productivity heatmap
+        $productivityHeatmap = $this->taskAnalytics->getProductivityHeatmap($taskPeriod, $user->id);
+        
+        // Get category breakdown
+        $taskCategoryBreakdown = $this->taskAnalytics->getCategoryBreakdown($user->id, [
+            'start_date' => $taskStartDate,
+            'end_date' => $taskEndDate
+        ]);
+        
+        // Get smart insights
+        $smartInsights = $this->taskAnalytics->generateSmartInsights($user->id);
+        
         return view('reports.index', compact(
             'currentMonthIncome',
             'currentMonthExpenses',
@@ -124,7 +161,16 @@ class ReportController extends Controller
             'lastYearTotal',
             'yearOverYearChange',
             'startDate',
-            'endDate'
+            'endDate',
+            'taskMetrics',
+            'completionTrend',
+            'priorityDistribution',
+            'productivityHeatmap',
+            'taskCategoryBreakdown',
+            'smartInsights',
+            'taskStartDate',
+            'taskEndDate',
+            'taskPeriod'
         ));
     }
 }

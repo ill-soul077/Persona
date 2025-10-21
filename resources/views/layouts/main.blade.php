@@ -78,7 +78,7 @@
         .btn.secondary{ background: var(--glass); color:var(--text); border:1px solid rgba(255,255,255,0.12) }
         .badge{ padding:6px 10px; border-radius:999px; background: rgba(16,185,129,.12); color:#a7f3d0; font-weight:600; border:1px solid rgba(16,185,129,.25) }
 
-        /* Quick actions */
+    /* Actions styling */
         .actions{ max-width:1200px; margin:18px auto 0; padding:0 20px; display:grid; grid-template-columns: repeat(5,1fr); gap:14px; }
         .action{ text-decoration:none; color:var(--text); display:flex; align-items:center; gap:12px; padding:16px; border-radius:14px; background: var(--surface); border:1px solid rgba(255,255,255,0.06); box-shadow: var(--shadow); transition: transform .2s, box-shadow .2s; }
         .action:hover{ transform: translateY(-2px); box-shadow: 0 16px 40px rgba(0,0,0,.45); }
