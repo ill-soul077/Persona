@@ -85,6 +85,15 @@ Route::middleware(['auth'])->prefix('tasks')->name('tasks.')->group(function () 
     Route::get('/export', [TaskController::class, 'export'])->name('export');
 });
 
+// Focus Mode Routes
+Route::middleware(['auth'])->prefix('focus')->name('focus.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\FocusSessionController::class, 'index'])->name('index');
+    Route::get('/analytics', [\App\Http\Controllers\FocusSessionController::class, 'analytics'])->name('analytics');
+    Route::post('/sessions/start', [\App\Http\Controllers\FocusSessionController::class, 'start'])->name('sessions.start');
+    Route::post('/sessions/{session}/complete', [\App\Http\Controllers\FocusSessionController::class, 'complete'])->name('sessions.complete');
+    Route::get('/sessions/history', [\App\Http\Controllers\FocusSessionController::class, 'history'])->name('sessions.history');
+});
+
 // Chat/AI API Routes (for AJAX)
 Route::middleware(['auth'])->prefix('api/chat')->name('chat.')->group(function () {
     Route::post('/send', [ChatController::class, 'send'])->name('send');
@@ -104,6 +113,19 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/settings/apps/connect', [SettingsController::class, 'connectApp'])->name('settings.apps.connect');
     Route::post('/settings/apps/disconnect', [SettingsController::class, 'disconnectApp'])->name('settings.apps.disconnect');
     Route::get('/settings/export', [SettingsController::class, 'exportData'])->name('settings.export');
+});
+
+// Task Templates
+Route::middleware(['auth'])->prefix('templates')->name('templates.')->group(function () {
+    Route::get('/', [App\Http\Controllers\TaskTemplateController::class, 'index'])->name('index');
+    Route::get('/create', [App\Http\Controllers\TaskTemplateController::class, 'create'])->name('create');
+    Route::post('/', [App\Http\Controllers\TaskTemplateController::class, 'store'])->name('store');
+    Route::get('/{template}', [App\Http\Controllers\TaskTemplateController::class, 'show'])->name('show');
+    Route::get('/{template}/edit', [App\Http\Controllers\TaskTemplateController::class, 'edit'])->name('edit');
+    Route::put('/{template}', [App\Http\Controllers\TaskTemplateController::class, 'update'])->name('update');
+    Route::delete('/{template}', [App\Http\Controllers\TaskTemplateController::class, 'destroy'])->name('destroy');
+    Route::post('/{template}/apply', [App\Http\Controllers\TaskTemplateController::class, 'apply'])->name('apply');
+    Route::get('/api/suggestions', [App\Http\Controllers\TaskTemplateController::class, 'suggestions'])->name('suggestions');
 });
 
 // Authentication Routes

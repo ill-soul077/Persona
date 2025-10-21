@@ -249,6 +249,94 @@
     </div>
 </div>
 
+<!-- Quick Templates Section -->
+<div class="glass-card rounded-xl p-6 animate-fade-in" x-data="quickTemplates()">
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-white">Quick Templates</h3>
+                <p class="text-gray-400 text-sm">Create tasks faster with templates</p>
+            </div>
+        </div>
+        <a href="{{ route('templates.index') }}" class="text-green-400 hover:text-green-300 transition-colors text-sm font-medium">
+            View All Templates →
+        </a>
+    </div>
+
+    @php
+        $popularTemplates = \App\Models\TaskTemplate::accessibleBy(Auth::id())
+            ->popular(4)
+            ->get();
+    @endphp
+
+    @if($popularTemplates->count() > 0)
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        @foreach($popularTemplates as $template)
+            <div class="p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-all group border border-white/10">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                             style="background: {{ $template->color ?? 'rgba(147, 51, 234, 0.2)' }}">
+                            {{ $template->icon ?? $template->getCategoryIcon() }}
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-white">{{ $template->name }}</h4>
+                            <p class="text-xs text-gray-400">{{ count($template->tasks) }} tasks • {{ $template->getCategoryIcon() }} {{ ucfirst($template->category) }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                @if($template->description)
+                    <p class="text-sm text-gray-300 mb-3">{{ Str::limit($template->description, 80) }}</p>
+                @endif
+
+                <div class="flex space-x-2">
+                    <form action="{{ route('templates.apply', $template) }}" method="POST" class="flex-1">
+                        @csrf
+                        <button type="submit" class="w-full glass-button text-white px-3 py-2 rounded-lg font-medium text-sm">
+                            Apply Now
+                        </button>
+                    </form>
+                    <a href="{{ route('templates.show', $template) }}" 
+                       class="px-3 py-2 rounded-lg font-medium text-sm bg-white/5 hover:bg-white/10 text-white transition">
+                        Preview
+                    </a>
+                </div>
+            </div>
+        @endforeach
+    </div>
+    @else
+    <div class="text-center py-12">
+        <div class="text-gray-400 mb-4">
+            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-medium text-white mb-2">No Templates Yet</h3>
+        <p class="text-gray-400 mb-4">Create your first template to speed up task creation</p>
+        <a href="{{ route('templates.create') }}" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            Create Template
+        </a>
+    </div>
+    @endif
+</div>
+
+<script>
+function quickTemplates() {
+    return {
+        // Future: Load suggested templates based on time of day
+    }
+}
+</script>
+
 <!-- Recent Transactions -->
 <div class="glass-card rounded-xl p-6 animate-fade-in">
     <div class="flex justify-between items-center mb-6">

@@ -410,10 +410,16 @@ class TaskController extends BaseController
         try {
             $task->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Task deleted successfully!'
-            ]);
+            // Return JSON for AJAX requests, redirect for form submissions
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Task deleted successfully!'
+                ]);
+            }
+
+            return redirect()->route('tasks.index')
+                ->with('success', 'Task deleted successfully!');
 
         } catch (\Exception $e) {
             Log::error('Task deletion failed', [
@@ -422,10 +428,15 @@ class TaskController extends BaseController
                 'error' => $e->getMessage()
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete task. Please try again.'
-            ], 422);
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to delete task. Please try again.'
+                ], 422);
+            }
+
+            return redirect()->route('tasks.index')
+                ->with('error', 'Failed to delete task. Please try again.');
         }
     }
 

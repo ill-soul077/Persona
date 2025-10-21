@@ -15,6 +15,18 @@
             <p class="text-gray-300 mt-2">Manage your tasks and stay productive</p>
         </div>
         <div class="mt-4 md:mt-0 flex space-x-3">
+            <a href="{{ route('templates.index') }}" class="bg-blue-600/80 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Templates</span>
+            </a>
+            <a href="{{ route('focus.index') }}" class="bg-purple-600/80 hover:bg-purple-500 text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>Focus Mode</span>
+            </a>
             <button onclick="showQuickAddModal()" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>

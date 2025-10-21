@@ -5,13 +5,24 @@
 @section('page-title', 'Task Details')
 
 @section('action-buttons')
-<a href="{{ route('tasks.index') }}" 
-   class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-    </svg>
-    <span>Back to Tasks</span>
-</a>
+<div class="flex space-x-3">
+    @if($task->status !== 'completed')
+    <a href="{{ route('focus.index', ['task_id' => $task->id]) }}" 
+       class="bg-purple-600/80 hover:bg-purple-500 text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span>Focus on This Task</span>
+    </a>
+    @endif
+    <a href="{{ route('tasks.index') }}" 
+       class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>Back to Tasks</span>
+    </a>
+</div>
 @endsection
 
 @section('content')
