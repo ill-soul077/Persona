@@ -102,6 +102,110 @@ class TaskController extends BaseController
     }
 
     /**
+     * Calendar view of tasks.
+     */
+    public function calendar(Request $request)
+    {
+        $filter = $request->get('filter', 'all');
+
+        $query = Task::where('user_id', Auth::id())
+            ->with(['history' => function($q) {
+                $q->latest()->limit(5);
+            }]);
+
+        // Apply filters similar to index
+        switch ($filter) {
+            case 'today':
+                $query->whereDate('due_date', today());
+                break;
+            case 'week':
+                $query->whereBetween('due_date', [today(), today()->addDays(7)]);
+                break;
+            case 'overdue':
+                $query->where('due_date', '<', now())->where('status', '!=', 'completed');
+                break;
+            case 'completed':
+                $query->where('status', 'completed');
+                break;
+            case 'pending':
+                $query->where('status', 'pending');
+                break;
+        }
+
+        $tasks = $query->orderBy('due_date', 'asc')
+            ->orderByRaw("FIELD(priority, 'urgent', 'high', 'medium', 'low')")
+            ->paginate(20);
+
+        // Stats
+        $stats = [
+            'total' => Task::where('user_id', Auth::id())->count(),
+            'today' => Task::where('user_id', Auth::id())->whereDate('due_date', today())->count(),
+            'week' => Task::where('user_id', Auth::id())->whereBetween('due_date', [today(), today()->addDays(7)])->count(),
+            'overdue' => Task::where('user_id', Auth::id())->where('due_date', '<', now())->where('status', '!=', 'completed')->count(),
+            'completed' => Task::where('user_id', Auth::id())->where('status', 'completed')->count(),
+        ];
+
+        // All tags
+        $allTags = Task::where('user_id', Auth::id())
+            ->whereNotNull('tags')
+            ->get()
+            ->pluck('tags')
+            ->flatten()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return view('tasks.calendar', compact('tasks', 'stats', 'allTags', 'filter'));
+    }
+
+    /**
+     * JSON feed for FullCalendar events.
+     */
+    public function calendarFeed(Request $request)
+    {
+        $userId = Auth::id();
+
+        $query = Task::where('user_id', $userId)
+            ->whereNotNull('due_date');
+
+        // FullCalendar may pass start/end query params
+        $start = $request->query('start');
+        $end = $request->query('end');
+        if ($start && $end) {
+            try {
+                $startDate = Carbon::parse($start)->startOfDay();
+                $endDate = Carbon::parse($end)->endOfDay();
+                $query->whereBetween('due_date', [$startDate, $endDate]);
+            } catch (\Exception $e) {
+                // ignore invalid dates and return all with due_date
+            }
+        }
+
+        $tasks = $query->get();
+
+        $priorityColors = [
+            'urgent' => '#dc2626', // red-600
+            'high' => '#f59e0b',   // amber-500
+            'medium' => '#3b82f6', // blue-500
+            'low' => '#10b981',    // emerald-500
+        ];
+
+        $events = $tasks->map(function ($task) use ($priorityColors) {
+            $due = $task->due_date instanceof Carbon ? $task->due_date : Carbon::parse($task->due_date);
+            return [
+                'id' => $task->id,
+                'title' => $task->title,
+                'start' => $due->toDateString(), // all-day
+                'allDay' => true,
+                'url' => route('tasks.show', $task),
+                'color' => $priorityColors[$task->priority] ?? '#6366f1', // fallback indigo-500
+            ];
+        });
+
+        return response()->json($events);
+    }
+
+    /**
      * Show the form for creating a new task.
      */
     public function create()

@@ -1,252 +1,325 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                📅 Task Calendar
-            </h2>
-            <div class="flex gap-3">
-                <button onclick="showQuickAddModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Quick Add
-                </button>
-                <a href="{{ route('tasks.create') }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    New Task
-                </a>
-            </div>
+@extends('layouts.app-master')
+
+@section('title', 'Tasks Calendar')
+@section('page-icon', '📅')
+@section('page-title', 'Task Calendar')
+
+@section('content')
+<!-- Calendar Header -->
+<div class="glass-card rounded-xl p-6 animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Task Calendar</h1>
+            <p class="text-gray-300 mt-2">See and manage your tasks on a calendar view</p>
         </div>
-    </x-slot>
+        <div class="mt-4 md:mt-0 flex space-x-3">
+            <button onclick="showQuickAddModal()" class="glass-button text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>Quick Add</span>
+            </button>
+            <a href="{{ route('tasks.create') }}" class="glass-button bg-purple-600/20 text-purple-400 border-purple-500/30 px-4 py-2 rounded-xl font-medium flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span>New Task</span>
+            </a>
+        </div>
+    </div>
+</div>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
-                    <div class="text-2xl font-bold text-gray-900">{{ $stats['total'] }}</div>
-                    <div class="text-sm text-gray-600">Total Tasks</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500">
-                    <div class="text-2xl font-bold text-gray-900">{{ $stats['today'] }}</div>
-                    <div class="text-sm text-gray-600">Due Today</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-500">
-                    <div class="text-2xl font-bold text-gray-900">{{ $stats['week'] }}</div>
-                    <div class="text-sm text-gray-600">This Week</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-orange-500">
-                    <div class="text-2xl font-bold text-gray-900">{{ $stats['overdue'] }}</div>
-                    <div class="text-sm text-gray-600">Overdue</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
-                    <div class="text-2xl font-bold text-gray-900">{{ $stats['completed'] }}</div>
-                    <div class="text-sm text-gray-600">Completed</div>
-                </div>
-            </div>
-
-            <!-- Filters and View Toggles -->
-            <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-                <div class="flex flex-wrap gap-4 items-center justify-between">
-                    <!-- Filter Buttons -->
-                    <div class="flex gap-2">
-                        <a href="{{ route('tasks.index', ['filter' => 'all', 'view' => 'calendar']) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition {{ $filter === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                            All
-                        </a>
-                        <a href="{{ route('tasks.index', ['filter' => 'today', 'view' => 'calendar']) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition {{ $filter === 'today' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                            Today
-                        </a>
-                        <a href="{{ route('tasks.index', ['filter' => 'week', 'view' => 'calendar']) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition {{ $filter === 'week' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                            This Week
-                        </a>
-                        <a href="{{ route('tasks.index', ['filter' => 'overdue', 'view' => 'calendar']) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition {{ $filter === 'overdue' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                            Overdue
-                        </a>
-                        <a href="{{ route('tasks.index', ['filter' => 'completed', 'view' => 'calendar']) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition {{ $filter === 'completed' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                            Completed
-                        </a>
-                    </div>
-
-                    <!-- View Toggle -->
-                    <div class="flex gap-2">
-                        <a href="{{ route('tasks.index', ['view' => 'list'] + request()->query()) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition bg-gray-100 text-gray-700 hover:bg-gray-200">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                            </svg>
-                        </a>
-                        <a href="{{ route('tasks.index', ['view' => 'calendar'] + request()->query()) }}" 
-                           class="px-4 py-2 rounded-lg font-medium transition bg-purple-600 text-white">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Calendar -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div id="calendar"></div>
-            </div>
-
-            <!-- Upcoming Tasks List -->
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div class="p-6 bg-gray-50 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Upcoming Tasks</h3>
-                </div>
-                
-                @forelse($tasks as $task)
-                    <div class="p-6 border-b border-gray-200 hover:bg-gray-50 transition {{ $task->status === 'completed' ? 'opacity-60' : '' }}">
-                        <div class="flex items-start gap-4">
-                            <!-- Priority Badge -->
-                            <div class="flex-shrink-0">
-                                @php
-                                    $priorityColors = [
-                                        'high' => 'bg-red-100 text-red-800 border-red-300',
-                                        'medium' => 'bg-yellow-100 text-yellow-800 border-yellow-300',
-                                        'low' => 'bg-green-100 text-green-800 border-green-300',
-                                    ];
-                                @endphp
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold border {{ $priorityColors[$task->priority] }}">
-                                    {{ strtoupper($task->priority) }}
-                                </span>
-                            </div>
-
-                            <!-- Task Content -->
-                            <div class="flex-1">
-                                <div class="flex items-start justify-between">
-                                    <div>
-                                        <h3 class="text-lg font-semibold text-gray-900 {{ $task->status === 'completed' ? 'line-through' : '' }}">
-                                            {{ $task->title }}
-                                        </h3>
-                                        @if($task->description)
-                                            <p class="text-sm text-gray-600 mt-1">{{ Str::limit($task->description, 150) }}</p>
-                                        @endif
-                                    </div>
-                                    
-                                    <div class="flex gap-2 ml-4">
-                                        <a href="{{ route('tasks.show', $task) }}" 
-                                           class="text-indigo-600 hover:text-indigo-900 transition">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                            </svg>
-                                        </a>
-                                        <a href="{{ route('tasks.edit', $task) }}" 
-                                           class="text-blue-600 hover:text-blue-900 transition">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </div>
-
-                                <!-- Task Meta Information -->
-                                <div class="mt-3 flex flex-wrap gap-4 text-sm text-gray-600">
-                                    @if($task->due_date)
-                                        <div class="flex items-center gap-1">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                            </svg>
-                                            <span class="{{ $task->isOverdue() ? 'text-red-600 font-semibold' : '' }}">
-                                                {{ \Carbon\Carbon::parse($task->due_date)->format('M d, Y') }}
-                                                @if($task->isOverdue())
-                                                    (Overdue)
-                                                @endif
-                                            </span>
-                                        </div>
-                                    @endif
-
-                                    <div class="flex items-center gap-1">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                        </svg>
-                                        <span class="capitalize">{{ $task->status }}</span>
-                                    </div>
-
-                                    @if($task->tags && count($task->tags) > 0)
-                                        <div class="flex items-center gap-1">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-                                            </svg>
-                                            <div class="flex gap-1 flex-wrap">
-                                                @foreach($task->tags as $tag)
-                                                    <span class="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs">{{ $tag }}</span>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="p-12 text-center">
-                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-                        <p class="text-gray-600 mb-4">Get started by creating your first task</p>
-                        <a href="{{ route('tasks.create') }}" class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition">
-                            Create Task
-                        </a>
-                    </div>
-                @endforelse
-            </div>
-
-            <!-- Pagination -->
-            @if($tasks->hasPages())
-                <div class="mt-6">
-                    {{ $tasks->links() }}
-                </div>
-            @endif
-
+<!-- Main Calendar Content -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 animate-slide-up">
+    <!-- Calendar Container -->
+    <div class="lg:col-span-2">
+        <div class="glass-card rounded-xl p-6">
+            <div id="calendar" class="rounded-lg overflow-hidden"></div>
         </div>
     </div>
 
-    @push('scripts')
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var calendarEl = document.getElementById('calendar');
-            var calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                },
-                events: '{{ route('tasks.calendar.feed') }}',
-                eventClick: function(info) {
-                    window.location.href = '/tasks/' + info.event.id;
-                },
-                eventClassNames: function(arg) {
-                    return ['cursor-pointer', 'hover:opacity-80'];
-                },
-                height: 'auto',
-                eventTimeFormat: {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    meridiem: false
-                }
-            });
-            calendar.render();
-        });
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Stats Overview -->
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-bold text-white mb-4">Overview</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white/5 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-white">{{ $stats['total'] }}</div>
+                    <div class="text-gray-400 text-sm mt-1">Total</div>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-yellow-400">{{ $stats['today'] }}</div>
+                    <div class="text-gray-400 text-sm mt-1">Today</div>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-400">{{ $stats['week'] }}</div>
+                    <div class="text-gray-400 text-sm mt-1">This Week</div>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-red-400">{{ $stats['overdue'] }}</div>
+                    <div class="text-gray-400 text-sm mt-1">Overdue</div>
+                </div>
+            </div>
+        </div>
 
-        // Quick Add Modal functionality (same as list view)
-        function showQuickAddModal() {
-            // Implement quick add modal
-            alert('Quick add functionality coming soon!');
-        }
-    </script>
-    @endpush
-</x-app-layout>
+        <!-- Filters -->
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-bold text-white mb-4">Filters</h3>
+            <div class="flex flex-col gap-2">
+                <a href="{{ route('tasks.index', ['filter' => 'all', 'view' => 'calendar']) }}" 
+                   class="px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 {{ $filter === 'all' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-gray-300 hover:bg-white/10' }}">
+                    All Tasks
+                </a>
+                <a href="{{ route('tasks.index', ['filter' => 'today', 'view' => 'calendar']) }}" 
+                   class="px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 {{ $filter === 'today' ? 'bg-yellow-600 text-white shadow-lg' : 'bg-white/5 text-gray-300 hover:bg-white/10' }}">
+                    Today
+                </a>
+                <a href="{{ route('tasks.index', ['filter' => 'week', 'view' => 'calendar']) }}" 
+                   class="px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 {{ $filter === 'week' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-gray-300 hover:bg-white/10' }}">
+                    This Week
+                </a>
+                <a href="{{ route('tasks.index', ['filter' => 'overdue', 'view' => 'calendar']) }}" 
+                   class="px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 {{ $filter === 'overdue' ? 'bg-red-600 text-white shadow-lg' : 'bg-white/5 text-gray-300 hover:bg-white/10' }}">
+                    Overdue
+                </a>
+                <a href="{{ route('tasks.index', ['filter' => 'completed', 'view' => 'calendar']) }}" 
+                   class="px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 {{ $filter === 'completed' ? 'bg-green-600 text-white shadow-lg' : 'bg-white/5 text-gray-300 hover:bg-white/10' }}">
+                    Completed
+                </a>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-bold text-white mb-4">Priority Legend</h3>
+            <div class="space-y-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span class="text-white text-sm">High Priority</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <span class="text-white text-sm">Medium Priority</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span class="text-white text-sm">Low Priority</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="text-white text-sm">Completed</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Tasks -->
+        <div class="glass-card rounded-xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white">Upcoming Tasks</h3>
+                <a href="{{ route('tasks.index') }}" class="text-purple-400 hover:text-purple-300 text-sm font-medium">
+                    View All →
+                </a>
+            </div>
+            <div class="space-y-3">
+                @forelse($tasks->take(5) as $task)
+                <a href="{{ route('tasks.show', $task) }}" 
+                   class="block p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 group">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="text-white font-medium group-hover:text-purple-400 transition-colors {{ $task->status === 'completed' ? 'line-through text-gray-500' : '' }}">
+                            {{ $task->title }}
+                        </h4>
+                        <span class="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded">
+                            {{ \Carbon\Carbon::parse($task->due_date)->format('M d') }}
+                        </span>
+                    </div>
+                    @if($task->description)
+                    <p class="text-gray-400 text-sm line-clamp-2">{{ $task->description }}</p>
+                    @endif
+                    <div class="flex justify-between items-center mt-3">
+                        @if($task->priority === 'high')
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                            High
+                        </span>
+                        @elseif($task->priority === 'medium')
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                            Medium
+                        </span>
+                        @else
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                            Low
+                        </span>
+                        @endif
+                        
+                        @if($task->status === 'completed')
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+                            Completed
+                        </span>
+                        @endif
+                    </div>
+                </a>
+                @empty
+                <div class="text-center py-8">
+                    <div class="text-gray-400 mb-3">
+                        <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <p class="text-gray-400 text-sm">No upcoming tasks</p>
+                </div>
+                @endforelse
+            </div>
+        </div>
+    </div>
+</div>
+
+@endsection
+
+@section('additional-scripts')
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            events: '{{ route('tasks.calendar.feed') }}',
+            eventClick: function(info) {
+                window.location.href = '/tasks/' + info.event.id;
+            },
+            eventClassNames: function(arg) {
+                return ['cursor-pointer', 'hover:opacity-80', 'border-0', 'rounded-lg'];
+            },
+            height: 'auto',
+            eventTimeFormat: {
+                hour: '2-digit',
+                minute: '2-digit',
+                meridiem: false
+            },
+            themeSystem: 'standard',
+            dayMaxEvents: 3,
+            eventDisplay: 'block',
+            views: {
+                dayGridMonth: {
+                    dayMaxEventRows: 3
+                }
+            }
+        });
+        calendar.render();
+    });
+
+    function showQuickAddModal() {
+        // Implement quick add modal functionality
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="glass-card rounded-xl p-6 max-w-md w-full mx-4 animate-bounce-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-white">Quick Add Task</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <form action="{{ route('tasks.store') }}" method="POST">
+                    @csrf
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-gray-300 text-sm font-medium mb-2">Title</label>
+                            <input type="text" name="title" required 
+                                   class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-gray-300 text-sm font-medium mb-2">Due Date</label>
+                            <input type="date" name="due_date" 
+                                   class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                        <div class="flex space-x-4">
+                            <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-colors">
+                                Add Task
+                            </button>
+                            <button type="button" onclick="this.closest('.fixed').remove()" class="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-medium transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+</script>
+
+<style>
+/* Custom FullCalendar styles to match the dashboard theme */
+.fc {
+    --fc-border-color: rgba(255, 255, 255, 0.1);
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: rgba(255, 255, 255, 0.05);
+    --fc-list-event-hover-bg-color: rgba(255, 255, 255, 0.1);
+}
+
+.fc .fc-toolbar {
+    color: white;
+}
+
+.fc .fc-toolbar-title {
+    color: white;
+    font-weight: 600;
+}
+
+.fc .fc-button {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    font-weight: 500;
+}
+
+.fc .fc-button:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+    background-color: rgb(147, 51, 234) !important;
+    border-color: rgb(147, 51, 234) !important;
+}
+
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion {
+    color: white;
+    text-decoration: none;
+}
+
+.fc .fc-day-other .fc-daygrid-day-top {
+    opacity: 0.5;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+    background-color: rgba(147, 51, 234, 0.2) !important;
+}
+
+.fc-event {
+    border: none !important;
+    padding: 4px 8px !important;
+    margin: 2px 0 !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+}
+
+.fc-event-title {
+    font-weight: 500 !important;
+}
+</style>
+@endsection
