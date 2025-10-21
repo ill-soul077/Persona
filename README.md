@@ -303,9 +303,7 @@ This project is licensed under the MIT License.
 **ill-soul077**
 - GitHub: [@ill-soul077](https://github.com/ill-soul077)
 
----
 
-<p align="center">Made with ❤️ using Laravel and Google Gemini AI</p>
 
 
 ## Laravel Sponsors
