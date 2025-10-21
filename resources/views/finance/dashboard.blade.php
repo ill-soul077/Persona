@@ -120,6 +120,14 @@
     </div>
 </div>
 
+<!-- Income vs Expense Comparison Chart -->
+<div class="glass-card rounded-xl p-6 animate-fade-in">
+    <h3 class="text-xl font-bold text-white mb-4">Income vs Expense Comparison</h3>
+    <div class="h-80 flex items-center justify-center">
+        <canvas id="comparisonChart" width="400" height="300"></canvas>
+    </div>
+</div>
+
 <!-- Recent Transactions -->
 <div class="glass-card rounded-xl p-6 animate-fade-in">
     <div class="flex justify-between items-center mb-6">
@@ -195,20 +203,33 @@
 
 @section('scripts')
 <script>
-// Chart.js configuration for Expense Breakdown
-@if(isset($expenseBreakdown) && !$expenseBreakdown->isEmpty())
-const expenseData = @json($expenseBreakdown);
-const expenseLabels = Object.keys(expenseData);
-const expenseValues = Object.values(expenseData);
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for Chart.js to load
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded!');
+        return;
+    } else {
+        console.log('Chart.js loaded successfully');
+    }
 
-if (expenseLabels.length > 0) {
-    const ctx1 = document.getElementById('expenseChart').getContext('2d');
-    new Chart(ctx1, {
+    // Chart.js configuration for Expense Breakdown
+@if(isset($expenseBreakdown) && !$expenseBreakdown->isEmpty())
+const expenseBreakdownData = @json($expenseBreakdown);
+const expenseBreakdownLabels = Object.keys(expenseBreakdownData);
+const expenseBreakdownValues = Object.values(expenseBreakdownData);
+
+console.log('Expense Breakdown Data:', { labels: expenseBreakdownLabels, values: expenseBreakdownValues });
+
+if (expenseBreakdownLabels.length > 0) {
+    const expenseChartElement = document.getElementById('expenseChart');
+    if (expenseChartElement) {
+        const ctx1 = expenseChartElement.getContext('2d');
+        new Chart(ctx1, {
         type: 'doughnut',
         data: {
-            labels: expenseLabels,
+            labels: expenseBreakdownLabels,
             datasets: [{
-                data: expenseValues,
+                data: expenseBreakdownValues,
                 backgroundColor: [
                     'rgba(239, 68, 68, 0.8)',
                     'rgba(245, 158, 11, 0.8)',
@@ -234,27 +255,53 @@ if (expenseLabels.length > 0) {
             }
         }
     });
+    } else {
+        console.error('Expense chart canvas element not found');
+    }
+} else {
+    console.warn('No expense breakdown data available');
 }
+@else
+console.log('Expense breakdown data is empty or not set');
 @endif
 
-// Monthly Trend Chart
-const ctx2 = document.getElementById('trendChart').getContext('2d');
+// Monthly Trend Chart with real data
+@if(isset($monthlyTrend) && isset($monthLabels) && count($monthlyTrend) > 0)
+const monthLabels = @json($monthLabels);
+const monthlyTrendData = @json($monthlyTrend);
+
+console.log('Monthly Trend Data:', monthlyTrendData);
+console.log('Month Labels:', monthLabels);
+
+const trendIncomeData = monthlyTrendData.map(month => parseFloat(month.income) || 0);
+const trendExpenseData = monthlyTrendData.map(month => parseFloat(month.expense) || 0);
+const trendBalanceData = monthlyTrendData.map(month => parseFloat(month.balance) || 0);
+
+console.log('Income Data:', trendIncomeData);
+console.log('Expense Data:', trendExpenseData);
+console.log('Balance Data:', trendBalanceData);
+
+const trendChartElement = document.getElementById('trendChart');
+if (trendChartElement) {
+    const ctx2 = trendChartElement.getContext('2d');
 new Chart(ctx2, {
     type: 'line',
     data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        labels: monthLabels,
         datasets: [{
             label: 'Income',
-            data: [{{ $totalIncome ?? 3000 }}, {{ ($totalIncome ?? 3000) * 0.9 }}, {{ ($totalIncome ?? 3000) * 1.1 }}, {{ ($totalIncome ?? 3000) * 1.2 }}, {{ ($totalIncome ?? 3000) * 0.8 }}, {{ $totalIncome ?? 3000 }}],
+            data: trendIncomeData,
             borderColor: 'rgba(34, 197, 94, 1)',
             backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            tension: 0.4
+            tension: 0.4,
+            fill: true
         }, {
             label: 'Expenses',
-            data: [{{ $totalExpense ?? 2200 }}, {{ ($totalExpense ?? 2200) * 1.1 }}, {{ ($totalExpense ?? 2200) * 0.9 }}, {{ ($totalExpense ?? 2200) * 1.3 }}, {{ ($totalExpense ?? 2200) * 0.7 }}, {{ $totalExpense ?? 2200 }}],
+            data: trendExpenseData,
             borderColor: 'rgba(239, 68, 68, 1)',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            tension: 0.4
+            tension: 0.4,
+            fill: true
         }]
     },
     options: {
@@ -263,14 +310,33 @@ new Chart(ctx2, {
         plugins: {
             legend: {
                 labels: {
-                    color: '#f8fafc'
+                    color: '#f8fafc',
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        label += '$' + context.parsed.y.toFixed(2);
+                        return label;
+                    }
                 }
             }
         },
         scales: {
             y: {
+                beginAtZero: true,
                 ticks: {
-                    color: '#f8fafc'
+                    color: '#f8fafc',
+                    callback: function(value) {
+                        return '$' + value.toFixed(0);
+                    }
                 },
                 grid: {
                     color: 'rgba(255, 255, 255, 0.1)'
@@ -287,5 +353,92 @@ new Chart(ctx2, {
         }
     }
 });
+}
+
+// Income vs Expense Comparison Bar Chart
+const comparisonChartElement = document.getElementById('comparisonChart');
+if (comparisonChartElement) {
+    const ctx3 = comparisonChartElement.getContext('2d');
+new Chart(ctx3, {
+    type: 'bar',
+    data: {
+        labels: monthLabels,
+        datasets: [{
+            label: 'Income',
+            data: trendIncomeData,
+            backgroundColor: 'rgba(34, 197, 94, 0.8)',
+            borderColor: 'rgba(34, 197, 94, 1)',
+            borderWidth: 2
+        }, {
+            label: 'Expenses',
+            data: trendExpenseData,
+            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+            borderColor: 'rgba(239, 68, 68, 1)',
+            borderWidth: 2
+        }, {
+            label: 'Balance',
+            data: trendBalanceData,
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 2,
+            type: 'line',
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    color: '#f8fafc',
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        label += '$' + context.parsed.y.toFixed(2);
+                        return label;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: '#f8fafc',
+                    callback: function(value) {
+                        return '$' + value.toFixed(0);
+                    }
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#f8fafc'
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                }
+            }
+        }
+    }
+});
+}
+@else
+    console.error('Monthly trend data not available or empty');
+@endif
+
+}); // End DOMContentLoaded
 </script>
 @endsection

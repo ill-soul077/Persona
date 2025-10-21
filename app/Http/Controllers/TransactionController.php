@@ -96,6 +96,33 @@ class TransactionController extends Controller
             ];
         }
 
+        // Monthly trend data for the last 6 months
+        $monthlyTrend = [];
+        $monthLabels = [];
+        
+        for ($i = 5; $i >= 0; $i--) {
+            $monthStart = now()->subMonths($i)->startOfMonth();
+            $monthEnd = now()->subMonths($i)->endOfMonth();
+            
+            $monthIncome = (float) Transaction::income()
+                ->where('user_id', $user->id)
+                ->whereBetween('date', [$monthStart, $monthEnd])
+                ->sum('amount');
+                
+            $monthExpense = (float) Transaction::expense()
+                ->where('user_id', $user->id)
+                ->whereBetween('date', [$monthStart, $monthEnd])
+                ->sum('amount');
+            
+            $monthlyTrend[] = [
+                'income' => $monthIncome,
+                'expense' => $monthExpense,
+                'balance' => $monthIncome - $monthExpense,
+            ];
+            
+            $monthLabels[] = $monthStart->format('M Y');
+        }
+
         return view('finance.dashboard', compact(
             'totalIncome',
             'totalExpense',
@@ -104,7 +131,9 @@ class TransactionController extends Controller
             'expenseBreakdown',
             'startDate',
             'endDate',
-            'budgetData'
+            'budgetData',
+            'monthlyTrend',
+            'monthLabels'
         ));
     }
 
