@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
+use Illuminate\Routing\Controller as BaseController;
 
-class TaskController extends Controller
+class TaskController extends BaseController
 {
     use AuthorizesRequests;
 
